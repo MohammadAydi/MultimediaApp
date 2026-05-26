@@ -11,7 +11,9 @@
 
         <Grid.RowDefinitions>
 
+            <!-- fix height 70 -->
             <RowDefinition Height="70"/>
+            <!-- take three part of the remaining space -->
             <RowDefinition Height="3*"/>
             <RowDefinition Height="170"/>
             <RowDefinition Height="2*"/>
@@ -22,7 +24,39 @@
         <Border Grid.Row="0"
                 Background="#2D2D30"
                 CornerRadius="10"
-                Margin="0,0,0,10"/>
+                Margin="0,0,0,10"
+                Padding="15">
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+
+                <Button Content="Open Audio"
+                        Width="120"
+                        Height="40"
+                        Margin="0,0,10,0"/>
+
+                <Button Content="Play"
+                        Width="100"
+                        Height="40"
+                        Margin="0,0,10,0"/>
+
+                <Button Content="Compress"
+                        Width="120"
+                        Height="40"
+                        Margin="0,0,10,0"/>
+
+                <Button Content="Stop"
+                        Width="100"
+                        Height="40"
+                        Margin="0,0,10,0"/>
+
+                <Button Content="Reset"
+                        Width="100"
+                        Height="40"/>
+
+            </StackPanel>
+
+        </Border>
 
         <Grid Grid.Row="1">
 
