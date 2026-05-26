@@ -1,24 +1,25 @@
 ﻿using System.Windows;
 using AudioCompressionApp.ViewModels;
+using Microsoft.Win32;
+using AudioCompressionApp.Services;
+using NAudio.Wave;
 
 namespace AudioCompressionApp.Views;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml
 /// </summary>
-public partial class MainWindow : Window
-{
-    public MainWindow()
-    {
+public partial class MainWindow : Window {
+    private readonly AudioFileService _audioFileService = new();
+
+    public MainWindow() {
         InitializeComponent();
 
         DataContext = new MainViewModel();
     }
-    
-    private void FileDropBorder_OnDragEnter(object sender, DragEventArgs e)
-    {
-        if (!e.Data.GetDataPresent(DataFormats.FileDrop))
-        {
+
+    private void FileDropBorder_OnDragEnter(object sender, DragEventArgs e) {
+        if (!e.Data.GetDataPresent(DataFormats.FileDrop)) {
             e.Effects = DragDropEffects.None;
             return;
         }
@@ -26,8 +27,7 @@ public partial class MainWindow : Window
         e.Effects = DragDropEffects.Copy;
     }
 
-    private void FileDropBorder_OnDrop(object sender, DragEventArgs e)
-    {
+    private void FileDropBorder_OnDrop(object sender, DragEventArgs e) {
         if (!e.Data.GetDataPresent(DataFormats.FileDrop))
             return;
 
@@ -38,6 +38,37 @@ public partial class MainWindow : Window
 
         string filePath = files[0];
 
-        MessageBox.Show(filePath);
+        LoadAudioFile(filePath);
+    }
+
+    private void OpenAudioButton_OnClick(object sender, RoutedEventArgs e) {
+        OpenFileDialog dialog = new() {
+            Title = "Open Audio File",
+            Filter =
+                "Audio Files|*.wav;*.mp3|" +
+                "WAV Files|*.wav|" +
+                "MP3 Files|*.mp3",
+            Multiselect = false,
+        };
+        bool? result = dialog.ShowDialog();
+        if (result != true)
+            return;
+        string filePath = dialog.FileName;
+        LoadAudioFile(filePath);
+    }
+
+    private void LoadAudioFile(string filePath) {
+        if (!_audioFileService.IsSupportedAudioFile(filePath)) {
+            MessageBox.Show("Unsupported audio format.");
+            return;
+        }
+
+        using AudioFileReader reader = new(filePath);
+
+        MessageBox.Show(
+            $"Sample Rate: {reader.WaveFormat.SampleRate}\n" +
+            $"Channels: {reader.WaveFormat.Channels}\n" +
+            $"Bits Per Sample: {reader.WaveFormat.BitsPerSample}"
+        );
     }
 }

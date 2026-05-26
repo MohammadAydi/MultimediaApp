@@ -33,7 +33,8 @@
                 <Button Content="Open Audio"
                         Width="120"
                         Height="40"
-                        Margin="0,0,10,0"/>
+                        Margin="0,0,10,0"
+                        Click="OpenAudioButton_OnClick"/>
 
                 <Button Content="Play"
                         Width="100"
