@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 using AudioCompressionApp.ViewModels;
 using Microsoft.Win32;
 using AudioCompressionApp.Services;
@@ -11,11 +12,12 @@ namespace AudioCompressionApp.Views;
 /// </summary>
 public partial class MainWindow : Window {
     private readonly AudioFileService _audioFileService = new();
+    private readonly MainViewModel _viewModel = new();
 
     public MainWindow() {
         InitializeComponent();
 
-        DataContext = new MainViewModel();
+        DataContext = _viewModel;
     }
 
     private void FileDropBorder_OnDragEnter(object sender, DragEventArgs e) {
@@ -57,18 +59,26 @@ public partial class MainWindow : Window {
         LoadAudioFile(filePath);
     }
 
-    private void LoadAudioFile(string filePath) {
-        if (!_audioFileService.IsSupportedAudioFile(filePath)) {
+    private void LoadAudioFile(string filePath)
+    {
+        if (!_audioFileService.IsSupportedAudioFile(filePath))
+        {
             MessageBox.Show("Unsupported audio format.");
             return;
         }
 
         using AudioFileReader reader = new(filePath);
 
-        MessageBox.Show(
-            $"Sample Rate: {reader.WaveFormat.SampleRate}\n" +
-            $"Channels: {reader.WaveFormat.Channels}\n" +
-            $"Bits Per Sample: {reader.WaveFormat.BitsPerSample}"
-        );
+        _viewModel.FileName = Path.GetFileName(filePath);
+
+        _viewModel.SampleRate =
+            $"{reader.WaveFormat.SampleRate} Hz";
+
+        _viewModel.Channels =
+            reader.WaveFormat.Channels.ToString();
+
+        _viewModel.BitsPerSample =
+            $"{reader.WaveFormat.BitsPerSample} Bit";
+        _viewModel.IsAudioLoaded = true;
     }
 }

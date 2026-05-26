@@ -44,7 +44,8 @@
                 <Button Content="Compress"
                         Width="120"
                         Height="40"
-                        Margin="0,0,10,0"/>
+                        Margin="0,0,10,0"
+                        Command="{Binding CompressCommand}"/>
 
                 <Button Content="Stop"
                         Width="100"
@@ -53,7 +54,8 @@
 
                 <Button Content="Reset"
                         Width="100"
-                        Height="40"/>
+                        Height="40"
+                        Command="{Binding ResetCommand}"/>
                 
                 <TextBlock Text="Audio Compression System"
                            Foreground="White"
@@ -117,15 +119,111 @@
 
         </Grid>
 
-        <Border Grid.Row="2"
-                Background="#2D2D30"
-                CornerRadius="10"
-                Margin="0,10,0,10"/>
+            <Border Grid.Row="2"
+                    Background="#2D2D30"
+                    CornerRadius="10"
+                    Margin="0,10,0,10"
+                    Padding="20">
 
-        <Border Grid.Row="3"
-                Background="#2D2D30"
-                CornerRadius="10"
-                Margin="0,0,0,10"/>
+                    <Grid>
+
+                            <Grid.ColumnDefinitions>
+
+                                    <ColumnDefinition Width="2*"/>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="1*"/>
+                                    <ColumnDefinition Width="1*"/>
+
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+
+                                    <TextBlock Text="File Name"
+                                               Foreground="#AAAAAA"
+                                               FontSize="14"/>
+
+                                    <TextBlock Text="{Binding FileName}"
+                                               Foreground="White"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Margin="0,8,0,0"/>
+
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="1">
+
+                                    <TextBlock Text="Sample Rate"
+                                               Foreground="#AAAAAA"
+                                               FontSize="14"/>
+
+                                    <TextBlock Text="{Binding SampleRate}"
+                                               Foreground="White"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Margin="0,8,0,0"/>
+
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="2">
+
+                                    <TextBlock Text="Channels"
+                                               Foreground="#AAAAAA"
+                                               FontSize="14"/>
+
+                                    <TextBlock Text="{Binding Channels}"
+                                               Foreground="White"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Margin="0,8,0,0"/>
+
+                            </StackPanel>
+
+                            <StackPanel Grid.Column="3">
+
+                                    <TextBlock Text="Bit Depth"
+                                               Foreground="#AAAAAA"
+                                               FontSize="14"/>
+
+                                    <TextBlock Text="{Binding BitsPerSample}"
+                                               Foreground="White"
+                                               FontSize="22"
+                                               FontWeight="Bold"
+                                               Margin="0,8,0,0"/>
+
+                            </StackPanel>
+
+                    </Grid>
+
+            </Border>
+
+            <Border Grid.Row="3"
+                    Background="#2D2D30"
+                    CornerRadius="10"
+                    Margin="0,0,0,10"
+                    Padding="20">
+
+                    <StackPanel>
+
+                            <TextBlock Text="Compression Progress"
+                                       Foreground="White"
+                                       FontSize="22"
+                                       FontWeight="Bold"
+                                       Margin="0,0,0,20"/>
+
+                            <ProgressBar Height="35"
+                                         Minimum="0"
+                                         Maximum="100"
+                                         Value="{Binding CompressionProgress}"/>
+
+                            <TextBlock Text="{Binding CompressionProgress, StringFormat={}{0:F0}%}"
+                                       Foreground="White"
+                                       FontSize="18"
+                                       Margin="0,15,0,0"
+                                       HorizontalAlignment="Center"/>
+
+                    </StackPanel>
+
+            </Border>
 
         <Border Grid.Row="4"
                 Background="#2D2D30"
