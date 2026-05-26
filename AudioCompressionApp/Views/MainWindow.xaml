@@ -34,12 +34,13 @@
                         Width="120"
                         Height="40"
                         Margin="0,0,10,0"
-                        Click="OpenAudioButton_OnClick" />
+                        Command="{Binding OpenAudioCommand}" />
 
                 <Button Content="Play"
                         Width="100"
                         Height="40"
-                        Margin="0,0,10,0" />
+                        Margin="0,0,10,0"
+                        Command="{Binding PlayCommand}" />
 
                 <Button Content="Compress"
                         Width="120"
@@ -51,7 +52,7 @@
                         Width="100"
                         Height="40"
                         Margin="0,0,10,0"
-                        Command="{Binding CancelCompressionCommand}" />
+                        Command="{Binding StopCommand}" />
 
                 <Button Content="Reset"
                         Width="100"
@@ -143,11 +144,13 @@
                                Foreground="#AAAAAA"
                                FontSize="14" />
 
-                    <TextBlock Text="{Binding FileName}"
-                               Foreground="White"
-                               FontSize="22"
-                               FontWeight="Bold"
-                               Margin="0,8,0,0" />
+                    <TextBlock
+                        Text="{Binding FileName,
+                  TargetNullValue=No File Loaded}"
+                        Foreground="White"
+                        FontSize="22"
+                        FontWeight="Bold"
+                        Margin="0,8,0,0" />
 
                 </StackPanel>
 
