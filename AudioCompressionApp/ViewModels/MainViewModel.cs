@@ -1,3 +1,5 @@
+using System.Windows.Forms;
+using AudioCompressionApp.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -19,9 +21,16 @@ public partial class MainViewModel : ObservableObject {
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CompressCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CancelCompressionCommand))]
     private bool isCompressing;
 
     [ObservableProperty] private double compressionProgress;
+
+    [ObservableProperty] private string processingSpeed = "-";
+
+    [ObservableProperty] private string compressionRatio = "-";
+
+    private CancellationTokenSource? _cancellationTokenSource;
 
     [RelayCommand(CanExecute = nameof(CanReset))]
     private void Reset() {
@@ -44,20 +53,62 @@ public partial class MainViewModel : ObservableObject {
     private async Task CompressAsync() {
         IsCompressing = true;
 
+        _cancellationTokenSource = new CancellationTokenSource();
+
         CompressionProgress = 0;
 
-        await Task.Run(async () => {
-            for (int i = 0; i <= 100; i++) {
-                CompressionProgress = i;
+        CompressionProgress = 0;
 
-                await Task.Delay(50);
+        CompressionRatio = "-";
+
+        ProcessingSpeed = "-";
+
+        IProgress<CompressionProgressModel> progressReporter = new Progress<CompressionProgressModel>(progress => {
+                CompressionProgress = progress.Progress;
+                CompressionRatio =
+                    $"{progress.CompressionRatio:F2}%";
+                ProcessingSpeed =
+                    $"{progress.ProcessingSpeed:F2} MB/s";
             }
-        });
+        );
 
-        IsCompressing = false;
+        try {
+            await Task.Run(async () => {
+                Random random = new Random();
+                for (int i = 0; i < 100; i++) {
+                    _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+                    progressReporter.Report(
+                        new CompressionProgressModel {
+                            Progress = i,
+
+                            CompressionRatio =
+                                40 + random.NextDouble() * 40,
+
+                            ProcessingSpeed =
+                                1 + random.NextDouble() * 8
+                        });
+                    await Task.Delay(60);
+                }
+            }, _cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException) {
+            MessageBox.Show("Compression canceled.");
+        }
+        finally {
+            IsCompressing = false;
+        }
     }
 
     private bool CanCompress() {
         return IsAudioLoaded && !IsCompressing;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanCancel))]
+    private void CancelCompression() {
+        _cancellationTokenSource?.Cancel();
+    }
+
+    private bool CanCancel() {
+        return IsCompressing;
     }
 }
