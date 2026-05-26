@@ -53,6 +53,13 @@
                 <Button Content="Reset"
                         Width="100"
                         Height="40"/>
+                
+                <TextBlock Text="Audio Compression System"
+                           Foreground="White"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Margin="30,0,0,0"
+                           VerticalAlignment="Center"/>
 
             </StackPanel>
 
@@ -67,10 +74,41 @@
 
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0"
-                    Background="#2D2D30"
-                    CornerRadius="10"
-                    Margin="0,0,10,0"/>
+                <Border Grid.Column="0"
+                        Background="#35363A"
+                        CornerRadius="10"
+                        Margin="0,0,10,0"
+                        AllowDrop="True"
+                        Drop="FileDropBorder_OnDrop"
+                        DragEnter="FileDropBorder_OnDragEnter">
+
+                        <Grid>
+
+                                <StackPanel HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+
+                                        <TextBlock Text="🎵"
+                                                   FontSize="72"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,20"/>
+
+                                        <TextBlock Text="Drag &amp; Drop Audio File Here"
+                                                   Foreground="White"
+                                                   FontSize="28"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"/>
+
+                                        <TextBlock Text="Supported: WAV, MP3"
+                                                   Foreground="#AAAAAA"
+                                                   FontSize="16"
+                                                   Margin="0,15,0,0"
+                                                   HorizontalAlignment="Center"/>
+
+                                </StackPanel>
+
+                        </Grid>
+
+                </Border>
 
             <Border Grid.Column="1"
                     Background="#2D2D30"
