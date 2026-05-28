@@ -5,7 +5,7 @@
         Width="1400"
         Height="900"
         WindowStartupLocation="CenterScreen"
-        Background="#1E1E1E">
+        Background="{StaticResource BackgroundBrush}">
 
     <Grid Margin="15">
 
@@ -22,7 +22,7 @@
         </Grid.RowDefinitions>
 
         <Border Grid.Row="0"
-                Background="#2D2D30"
+                Background="{StaticResource SurfaceBrush}"
                 CornerRadius="10"
                 Margin="0,0,0,10"
                 Padding="15">
@@ -60,7 +60,7 @@
                         Command="{Binding ResetCommand}" />
 
                 <TextBlock Text="Audio Compression System"
-                           Foreground="White"
+                           Foreground="{StaticResource TextBrush}"
                            FontSize="24"
                            FontWeight="Bold"
                            Margin="30,0,0,0"
@@ -80,7 +80,7 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0"
-                    Background="#35363A"
+                    Background="{StaticResource SurfaceBrush}"
                     CornerRadius="10"
                     Margin="0,0,10,0"
                     AllowDrop="True"
@@ -98,13 +98,13 @@
                                    Margin="0,0,0,20" />
 
                         <TextBlock Text="Drag &amp; Drop Audio File Here"
-                                   Foreground="White"
+                                   Foreground="{StaticResource TextBrush}"
                                    FontSize="28"
                                    FontWeight="Bold"
                                    HorizontalAlignment="Center" />
 
                         <TextBlock Text="Supported: WAV, MP3"
-                                   Foreground="#AAAAAA"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
                                    FontSize="16"
                                    Margin="0,15,0,0"
                                    HorizontalAlignment="Center" />
@@ -116,13 +116,76 @@
             </Border>
 
             <Border Grid.Column="1"
-                    Background="#2D2D30"
-                    CornerRadius="10" />
+                    Background="{StaticResource SurfaceBrush}"
+                    CornerRadius="10"
+                    Padding="20">
+
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+
+                    <StackPanel>
+
+                        <TextBlock Text="Compression Settings"
+                                   Foreground="{StaticResource TextBrush}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Margin="0,0,0,25" />
+
+                        <TextBlock Text="Algorithm"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   FontSize="15" />
+
+                        <ComboBox ItemsSource="{Binding Algorithms}"
+                                  SelectedItem="{Binding SelectedAlgorithm}"
+                                  DisplayMemberPath="Name"
+                                  Margin="0,10,0,25"
+                                  Height="35" />
+
+                        <TextBlock Text="Sample Rate"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   FontSize="15" />
+
+                        <Slider Minimum="8000"
+                                Maximum="48000"
+                                TickFrequency="4000"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding SelectedSampleRate}"
+                                Margin="0,10,0,0" />
+
+                        <TextBlock
+                            Text="{Binding SelectedSampleRate,
+                                      StringFormat={}{0:F0} Hz}"
+                            Foreground="{StaticResource TextBrush}"
+                            FontSize="16"
+                            Margin="0,5,0,25" />
+
+                        <TextBlock Text="Quantization Levels"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   FontSize="15" />
+
+                        <Slider Minimum="2"
+                                Maximum="32"
+                                TickFrequency="2"
+                                IsSnapToTickEnabled="True"
+                                Value="{Binding QuantizationLevels}"
+                                Margin="0,10,0,0" />
+
+                        <TextBlock
+                            Text="{Binding QuantizationLevels,
+                                      StringFormat={}{0:F0} Bit}"
+                            Foreground="{StaticResource TextBrush}"
+                            FontSize="16"
+                            Margin="0,5,0,0" />
+
+                    </StackPanel>
+
+                </ScrollViewer>
+
+            </Border>
 
         </Grid>
 
         <Border Grid.Row="2"
-                Background="#2D2D30"
+                Background="{StaticResource SurfaceBrush}"
                 CornerRadius="10"
                 Margin="0,10,0,10"
                 Padding="20">
@@ -141,13 +204,13 @@
                 <StackPanel Grid.Column="0">
 
                     <TextBlock Text="File Name"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="14" />
 
                     <TextBlock
                         Text="{Binding FileName,
                   TargetNullValue=No File Loaded}"
-                        Foreground="White"
+                        Foreground="{StaticResource TextBrush}"
                         FontSize="22"
                         FontWeight="Bold"
                         Margin="0,8,0,0" />
@@ -157,11 +220,11 @@
                 <StackPanel Grid.Column="1">
 
                     <TextBlock Text="Sample Rate"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="14" />
 
                     <TextBlock Text="{Binding SampleRate}"
-                               Foreground="White"
+                               Foreground="{StaticResource TextBrush}"
                                FontSize="22"
                                FontWeight="Bold"
                                Margin="0,8,0,0" />
@@ -171,11 +234,11 @@
                 <StackPanel Grid.Column="2">
 
                     <TextBlock Text="Channels"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="14" />
 
                     <TextBlock Text="{Binding Channels}"
-                               Foreground="White"
+                               Foreground="{StaticResource TextBrush}"
                                FontSize="22"
                                FontWeight="Bold"
                                Margin="0,8,0,0" />
@@ -185,11 +248,11 @@
                 <StackPanel Grid.Column="3">
 
                     <TextBlock Text="Bit Depth"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="14" />
 
                     <TextBlock Text="{Binding BitsPerSample}"
-                               Foreground="White"
+                               Foreground="{StaticResource TextBrush}"
                                FontSize="22"
                                FontWeight="Bold"
                                Margin="0,8,0,0" />
@@ -201,7 +264,7 @@
         </Border>
 
         <Border Grid.Row="3"
-                Background="#2D2D30"
+                Background="{StaticResource SurfaceBrush}"
                 CornerRadius="10"
                 Margin="0,0,0,10"
                 Padding="20">
@@ -209,7 +272,7 @@
             <StackPanel>
 
                 <TextBlock Text="Compression Progress"
-                           Foreground="White"
+                           Foreground="{StaticResource TextBrush}"
                            FontSize="22"
                            FontWeight="Bold"
                            Margin="0,0,0,20" />
@@ -220,7 +283,7 @@
                              Value="{Binding CompressionProgress}" />
 
                 <TextBlock Text="{Binding CompressionProgress, StringFormat={}{0:F0}%}"
-                           Foreground="White"
+                           Foreground="{StaticResource TextBrush}"
                            FontSize="18"
                            Margin="0,15,0,0"
                            HorizontalAlignment="Center" />
@@ -230,7 +293,7 @@
         </Border>
 
         <Border Grid.Row="4"
-                Background="#2D2D30"
+                Background="{StaticResource SurfaceBrush}"
                 CornerRadius="10"
                 Padding="20">
 
@@ -246,11 +309,11 @@
                 <StackPanel Grid.Column="0">
 
                     <TextBlock Text="Compression Ratio"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="16" />
 
                     <TextBlock Text="{Binding CompressionRatio}"
-                               Foreground="White"
+                               Foreground="{StaticResource TextBrush}"
                                FontSize="32"
                                FontWeight="Bold"
                                Margin="0,10,0,0" />
@@ -260,11 +323,11 @@
                 <StackPanel Grid.Column="1">
 
                     <TextBlock Text="Processing Speed"
-                               Foreground="#AAAAAA"
+                               Foreground="{StaticResource SecondaryTextBrush}"
                                FontSize="16" />
 
                     <TextBlock Text="{Binding ProcessingSpeed}"
-                               Foreground="White"
+                               Foreground="{StaticResource TextBrush}"
                                FontSize="32"
                                FontWeight="Bold"
                                Margin="0,10,0,0" />
