@@ -5,7 +5,7 @@ using AudioCompressionApp.Models;
 public abstract class CompressionAlgorithmBase
     : ICompressionAlgorithm {
     public abstract string Name { get; }
-    public byte[] CompressedData { get; }
+    public byte[] CompressedData { get; protected set; } = Array.Empty<byte>();
 
     public Task<CompressionResult> CompressAsync(
         CompressionContext context,
@@ -35,15 +35,17 @@ public abstract class CompressionAlgorithmBase
 
         FinalizeEncoding();
         stopwatch.Stop();
-        CompressionResult result = new CompressionResult {
-            CompressionRatio = 30,
-            CompressionTime = stopwatch.Elapsed,
-            CompressedData = CompressedData,
+
+        CompressionResult result = new CompressionResult
+        {
+            CompressionRatio = CalculateCurrentRatio(),
+            CompressionTime  = stopwatch.Elapsed,
+            CompressedData   = CompressedData,
         };
         return Task.FromResult(result);
     }
-
-    public byte[] Decompress(byte[] compressedData) {
+    public virtual byte[] Decompress(byte[] compressedData)
+    {
         throw new NotImplementedException();
     }
 
@@ -63,16 +65,15 @@ public abstract class CompressionAlgorithmBase
         int current,
         int total,
         Stopwatch stopwatch,
-        IProgress<CompressionProgressModel> progress) {
-        double percentage =
-            (double)current / total * 100;
+        IProgress<CompressionProgressModel> progress)
+    {
+        double percentage = (double)current / total * 100;
+        double speed      = current / stopwatch.Elapsed.TotalSeconds;
 
-        double speed =
-            current / stopwatch.Elapsed.TotalSeconds;
-
-        progress?.Report(new CompressionProgressModel {
-            Progress = percentage,
-            ProcessingSpeed = speed,
+        progress?.Report(new CompressionProgressModel
+        {
+            Progress         = percentage,
+            ProcessingSpeed  = speed,
             CompressionRatio = CalculateCurrentRatio()
         });
     }

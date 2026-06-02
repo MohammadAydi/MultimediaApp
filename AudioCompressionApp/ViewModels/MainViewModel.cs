@@ -7,6 +7,7 @@ using System.Windows;
 using AudioCompressionApp.Algorithms;
 using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Models;
+using AudioCompressionApp.Models.Settings;
 using AudioCompressionApp.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,7 +27,7 @@ public partial class MainViewModel : ObservableObject {
         _audioFileService = audioFileService;
         _audioPlaybackService = audioPlaybackService;
         Algorithms = [
-            new DPCMCompressionAlgorithm(),
+            new DpcmCompressionAlgorithm(),
             new AdaptiveDeltaModulationCompressionAlgorithm(),
             new DeltaModulationCompressionAlgorithm(),
             new NonlinearQuantizationCompressionAlgorithm(),
@@ -164,40 +165,109 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand(CanExecute = nameof(CanCompress))]
     private async Task CompressAsync() {
+        if (CurrentAudioFile == null || SelectedAlgorithm == null)
+            return;
+
         IsCompressing = true;
         _cancellationTokenSource = new CancellationTokenSource();
 
         CompressionProgress = 0;
-        CompressionRatio = "-";
-        ProcessingSpeed = "-";
-        AddLog("Compression started");
+        CompressionRatio    = "-";
+        ProcessingSpeed     = "-";
+        AddLog($"Compression started — Algorithm: {SelectedAlgorithm.Name}");
 
-        IProgress<CompressionProgressModel> progressReporter = new Progress<CompressionProgressModel>(progress => {
-            CompressionProgress = progress.Progress;
-            CompressionRatio = $"{progress.CompressionRatio:F2}%";
-            ProcessingSpeed = $"{progress.ProcessingSpeed:F2} MB/s";
-        });
+        IProgress<CompressionProgressModel> progressReporter =
+            new Progress<CompressionProgressModel>(progress => {
+                CompressionProgress = progress.Progress;
+                CompressionRatio    = $"{progress.CompressionRatio:F2}:1";
+                ProcessingSpeed     = $"{progress.ProcessingSpeed:F0} samples/s";
+            });
 
-        try {
-            await Task.Run(async () => {
-                Random random = new Random();
-                for (int i = 0; i < 100; i++) {
-                    _cancellationTokenSource.Token.ThrowIfCancellationRequested();
+        try { 
+            short[] samples;
+            await using (var waveReader = new WaveFileReader(CurrentAudioFile.FilePath)) {
+                var totalBytes = (int)waveReader.Length;
+                var buffer     = new byte[totalBytes];
+                await waveReader.ReadExactlyAsync(buffer, 0, totalBytes);
 
-                    progressReporter.Report(new CompressionProgressModel {
-                        Progress = i,
-                        CompressionRatio = 40 + random.NextDouble() * 40,
-                        ProcessingSpeed = 1 + random.NextDouble() * 8
-                    });
+                samples = new short[totalBytes / 2];
+                for (var i = 0; i < samples.Length; i++)
+                    samples[i] = (short)(buffer[i * 2] | (buffer[i * 2 + 1] << 8));
+            }
 
-                    await Task.Delay(60);
+            Console.WriteLine($"\n[Compress] Loaded {samples.Length:N0} samples — {CurrentAudioFile.FileName}");
+ 
+            var context = new CompressionContext {
+                Samples  = samples,
+                Settings = new DpcmSettings {
+                    SampleRate       = CurrentAudioFile.SampleRate,
+                    Channels         = CurrentAudioFile.Channels,
+                    BitsPerSample    = CurrentAudioFile.BitsPerSample,
+                    QuantizationStep = 2,
+                    DeltaBits        = 12,
                 }
-            }, _cancellationTokenSource.Token);
-            AddLog("Compression completed");
+            };
+ 
+            CompressionResult result = await SelectedAlgorithm.CompressAsync(
+                context,
+                progressReporter,
+                _cancellationTokenSource.Token);
+ 
+            string outputDpcm = Path.ChangeExtension(CurrentAudioFile.FilePath, ".dpcm");
+            await File.WriteAllBytesAsync(outputDpcm, result.CompressedData);
+ 
+            byte[] pcmBytes         = SelectedAlgorithm.Decompress(result.CompressedData);
+            string reconstructedWav = Path.ChangeExtension(CurrentAudioFile.FilePath, ".reconstructed.wav");
+            var    waveFormat       = new WaveFormat(
+                                          CurrentAudioFile.SampleRate,
+                                          CurrentAudioFile.BitsPerSample,
+                                          CurrentAudioFile.Channels);
+
+            await using (var writer = new WaveFileWriter(reconstructedWav, waveFormat))
+                writer.Write(pcmBytes, 0, pcmBytes.Length);
+ 
+            var reconstructed = new short[pcmBytes.Length / 2];
+            for (var i = 0; i < reconstructed.Length; i++)
+                reconstructed[i] = (short)(pcmBytes[i * 2] | (pcmBytes[i * 2 + 1] << 8));
+
+            double signalPower = 0, noisePower = 0;
+            var    count       = Math.Min(samples.Length, reconstructed.Length);
+            for (var i = 0; i < count; i++) {
+                double s = samples[i];
+                double e = samples[i] - reconstructed[i];
+                signalPower += s * s;
+                noisePower  += e * e;
+            }
+            var snr = noisePower < double.Epsilon
+                ? double.PositiveInfinity
+                : 10.0 * Math.Log10(signalPower / noisePower);
+ 
+            long originalSize = new FileInfo(CurrentAudioFile.FilePath).Length;
+            long dpcmSize     = new FileInfo(outputDpcm).Length;
+            var snrStr     = double.IsPositiveInfinity(snr) ? "∞ dB (Lossless)" : $"{snr:F2} dB";
+
+            Console.WriteLine("\n========== COMPRESSION RESULTS ==========");
+            Console.WriteLine($"  Algorithm         : {SelectedAlgorithm.Name}");
+            Console.WriteLine($"  Compression Time  : {result.CompressionTime.TotalMilliseconds:F0} ms");
+            Console.WriteLine($"  Compression Ratio : {result.CompressionRatio:F2}:1");
+            Console.WriteLine($"  Original size     : {originalSize:N0} bytes");
+            Console.WriteLine($"  Compressed size   : {dpcmSize:N0} bytes");
+            Console.WriteLine($"  Space saved       : {(1.0 - (double)dpcmSize / originalSize) * 100:F1}%");
+            Console.WriteLine($"  SNR               : {snrStr}");
+            Console.WriteLine($"  Output .dpcm      : {outputDpcm}");
+            Console.WriteLine($"  Reconstructed WAV : {reconstructedWav}");
+            Console.WriteLine("=========================================\n");
+
+            AddLog($"Done — Ratio: {result.CompressionRatio:F2}:1 | SNR: {(double.IsPositiveInfinity(snr) ? "∞" : $"{snr:F2}")} dB");
         }
         catch (OperationCanceledException) {
             AddLog("Compression canceled");
             MessageBox.Show("Compression canceled.");
+        }
+        catch (Exception ex) {
+            AddLog($"Error: {ex.Message}");
+            Console.WriteLine($"[ERROR] {ex}");
+            MessageBox.Show($"Error: {ex.Message}");
         }
         finally {
             IsCompressing = false;
