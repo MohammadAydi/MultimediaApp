@@ -36,15 +36,17 @@ public abstract class CompressionAlgorithmBase
 
         FinalizeEncoding();
         stopwatch.Stop();
-        CompressionResult result = new CompressionResult {
-            CompressionRatio = 30,
-            CompressionTime = stopwatch.Elapsed,
-            CompressedData = CompressedData,
+
+        CompressionResult result = new CompressionResult
+        {
+            CompressionRatio = CalculateCurrentRatio(),
+            CompressionTime  = stopwatch.Elapsed,
+            CompressedData   = CompressedData,
         };
         return Task.FromResult(result);
     }
 
-    public virtual DecompressionResult Decompress(byte[] compressedData) {
+    public byte[] Decompress(byte[] compressedData) {
         throw new NotImplementedException();
     }
 
@@ -64,16 +66,15 @@ public abstract class CompressionAlgorithmBase
         int current,
         int total,
         Stopwatch stopwatch,
-        IProgress<CompressionProgressModel> progress) {
-        double percentage =
-            (double)current / total * 100;
+        IProgress<CompressionProgressModel> progress)
+    {
+        double percentage = (double)current / total * 100;
+        double speed      = current / stopwatch.Elapsed.TotalSeconds;
 
-        double speed =
-            current / stopwatch.Elapsed.TotalSeconds;
-
-        progress?.Report(new CompressionProgressModel {
-            Progress = percentage,
-            ProcessingSpeed = speed,
+        progress?.Report(new CompressionProgressModel
+        {
+            Progress         = percentage,
+            ProcessingSpeed  = speed,
             CompressionRatio = CalculateCurrentRatio()
         });
     }
