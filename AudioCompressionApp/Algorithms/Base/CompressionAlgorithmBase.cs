@@ -46,7 +46,7 @@ public abstract class CompressionAlgorithmBase
         return Task.FromResult(result);
     }
 
-    public byte[] Decompress(byte[] compressedData) {
+    public virtual DecompressionResult  Decompress(byte[] compressedData) {
         throw new NotImplementedException();
     }
 

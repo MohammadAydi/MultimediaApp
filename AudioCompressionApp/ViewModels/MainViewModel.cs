@@ -216,23 +216,30 @@ public partial class MainViewModel : ObservableObject {
             string outputDpcm = Path.ChangeExtension(CurrentAudioFile.FilePath, ".dpcm");
             await File.WriteAllBytesAsync(outputDpcm, result.CompressedData);
  
-            byte[] pcmBytes         = SelectedAlgorithm.Decompress(result.CompressedData);
-            string reconstructedWav = Path.ChangeExtension(CurrentAudioFile.FilePath, ".reconstructed.wav");
-            var    waveFormat       = new WaveFormat(
-                                          CurrentAudioFile.SampleRate,
-                                          CurrentAudioFile.BitsPerSample,
-                                          CurrentAudioFile.Channels);
+            var decompressed = SelectedAlgorithm.Decompress(result.CompressedData);
+
+            string reconstructedWav =
+                Path.ChangeExtension(CurrentAudioFile.FilePath, ".reconstructed.wav");
+
+            var waveFormat = new WaveFormat(
+                CurrentAudioFile.SampleRate,
+                CurrentAudioFile.BitsPerSample,
+                CurrentAudioFile.Channels);
 
             await using (var writer = new WaveFileWriter(reconstructedWav, waveFormat))
-                writer.Write(pcmBytes, 0, pcmBytes.Length);
- 
-            var reconstructed = new short[pcmBytes.Length / 2];
-            for (var i = 0; i < reconstructed.Length; i++)
-                reconstructed[i] = (short)(pcmBytes[i * 2] | (pcmBytes[i * 2 + 1] << 8));
+            {
+                foreach (var sample in decompressed.Samples)
+                    writer.Write(BitConverter.GetBytes((short)sample), 0, 2);
+            }
+
+            var reconstructed = decompressed.Samples;
 
             double signalPower = 0, noisePower = 0;
-            var    count       = Math.Min(samples.Length, reconstructed.Length);
-            for (var i = 0; i < count; i++) {
+
+            int count = Math.Min(samples.Length, reconstructed.Length);
+
+            for (int i = 0; i < count; i++)
+            {
                 double s = samples[i];
                 double e = samples[i] - reconstructed[i];
                 signalPower += s * s;

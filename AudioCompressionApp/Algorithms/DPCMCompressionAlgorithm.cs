@@ -123,7 +123,7 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
     }
  
 
-    public override byte[] Decompress(byte[] compressedData)
+    public override DecompressionResult Decompress(byte[] compressedData)
     {
         using var inputStream  = new MemoryStream(compressedData);
         using var binaryReader = new BinaryReader(inputStream);
@@ -162,6 +162,17 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
         }
 
         pcmWriter.Flush();
-        return outputStream.ToArray();
+        short[] samples = outputStream
+            .ToArray()
+            .Chunk(2)
+            .Select(b => BitConverter.ToInt16(b))
+            .ToArray();
+
+        return new DecompressionResult(
+            samples,
+            header.SampleRate,
+            (short)header.Channels,
+            (short)header.BitsPerSample
+        );
     }
 }
