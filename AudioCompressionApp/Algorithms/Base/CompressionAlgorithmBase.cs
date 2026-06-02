@@ -5,7 +5,8 @@ using AudioCompressionApp.Models;
 public abstract class CompressionAlgorithmBase
     : ICompressionAlgorithm {
     public abstract string Name { get; }
-    public byte[] CompressedData { get; }
+
+    protected byte[] CompressedData = [];
 
     public Task<CompressionResult> CompressAsync(
         CompressionContext context,
@@ -43,7 +44,7 @@ public abstract class CompressionAlgorithmBase
         return Task.FromResult(result);
     }
 
-    public byte[] Decompress(byte[] compressedData) {
+    public virtual DecompressionResult Decompress(byte[] compressedData) {
         throw new NotImplementedException();
     }
 
