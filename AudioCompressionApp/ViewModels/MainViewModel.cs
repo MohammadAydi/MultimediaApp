@@ -211,47 +211,27 @@ public partial class MainViewModel : ObservableObject {
                 context,
                 progressReporter,
                 _cancellationTokenSource.Token);
- 
-            string outputDpcm = Path.ChangeExtension(CurrentAudioFile.FilePath, ".dpcm");
-            await File.WriteAllBytesAsync(outputDpcm, result.CompressedData);
- 
+  
+            string outputDpcm = await _audioFileService.SaveCompressedFileAsync(
+                CurrentAudioFile.FilePath, 
+                result.CompressedData);
+  
             var decompressed = SelectedAlgorithm.Decompress(result.CompressedData);
-
-            string reconstructedWav =
-                Path.ChangeExtension(CurrentAudioFile.FilePath, ".reconstructed.wav");
-
-            var waveFormat = new WaveFormat(
-                CurrentAudioFile.SampleRate,
-                CurrentAudioFile.BitsPerSample,
-                CurrentAudioFile.Channels);
-
-            await using (var writer = new WaveFileWriter(reconstructedWav, waveFormat))
-            {
-                foreach (var sample in decompressed.Samples)
-                    writer.Write(BitConverter.GetBytes((short)sample), 0, 2);
-            }
-
             var reconstructed = decompressed.Samples;
-
-            double signalPower = 0, noisePower = 0;
-
-            int count = Math.Min(samples.Length, reconstructed.Length);
-
-            for (int i = 0; i < count; i++)
-            {
-                double s = samples[i];
-                double e = samples[i] - reconstructed[i];
-                signalPower += s * s;
-                noisePower  += e * e;
-            }
-            var snr = noisePower < double.Epsilon
-                ? double.PositiveInfinity
-                : 10.0 * Math.Log10(signalPower / noisePower);
  
-            long originalSize = new FileInfo(CurrentAudioFile.FilePath).Length;
-            long dpcmSize     = new FileInfo(outputDpcm).Length;
-            var snrStr     = double.IsPositiveInfinity(snr) ? "∞ dB (Lossless)" : $"{snr:F2} dB";
-
+            string reconstructedWav = await _audioFileService.SaveReconstructedWavAsync(
+                CurrentAudioFile.FilePath,
+                reconstructed,
+                CurrentAudioFile.SampleRate,
+                16, //مهمة ة ة ة ة
+                CurrentAudioFile.Channels);
+ 
+            double snr = SignalQualityAnalyzer.ComputeSnrDb(samples, reconstructed);
+  
+            long originalSize = _audioFileService.GetFileSize(CurrentAudioFile.FilePath);
+            long dpcmSize     = _audioFileService.GetFileSize(outputDpcm);
+            var snrStr        = double.IsPositiveInfinity(snr) ? "∞ dB (Lossless)" : $"{snr:F2} dB";
+ 
             Console.WriteLine("\n========== COMPRESSION RESULTS ==========");
             Console.WriteLine($"  Algorithm         : {SelectedAlgorithm.Name}");
             Console.WriteLine($"  Compression Time  : {result.CompressionTime.TotalMilliseconds:F0} ms");
@@ -263,7 +243,9 @@ public partial class MainViewModel : ObservableObject {
             Console.WriteLine($"  Output .dpcm      : {outputDpcm}");
             Console.WriteLine($"  Reconstructed WAV : {reconstructedWav}");
             Console.WriteLine("=========================================\n");
-
+            Console.WriteLine($"[Debug] Original Samples Count   : {samples.Length}");
+            Console.WriteLine($"[Debug] Reconstructed Samples Count: {reconstructed.Length}");
+            Console.WriteLine($"[Debug] Audio Channels Count       : {CurrentAudioFile.Channels}");
             AddLog($"Done — Ratio: {result.CompressionRatio:F2}:1 | SNR: {(double.IsPositiveInfinity(snr) ? "∞" : $"{snr:F2}")} dB");
         }
         catch (OperationCanceledException) {
