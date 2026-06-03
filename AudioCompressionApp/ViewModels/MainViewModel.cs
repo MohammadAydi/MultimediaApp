@@ -197,14 +197,13 @@ public partial class MainViewModel : ObservableObject {
 
             Console.WriteLine($"\n[Compress] Loaded {samples.Length:N0} samples — {CurrentAudioFile.FileName}");
  
-            var context = new CompressionContext {
-                Samples  = samples,
-                Settings = new DpcmSettings {
-                    SampleRate       = CurrentAudioFile.SampleRate,
-                    Channels         = CurrentAudioFile.Channels,
-                    BitsPerSample    = CurrentAudioFile.BitsPerSample,
-                    QuantizationStep = 8,
-                }
+            var context = new CompressionContext
+            {
+                Samples = samples,
+                Settings = CreateSettingsForAlgorithm(SelectedAlgorithm),
+                SampleRate = CurrentAudioFile.SampleRate,
+                Channels = (short)CurrentAudioFile.Channels,
+                BitsPerSample = (short)CurrentAudioFile.BitsPerSample
             };
  
             CompressionResult result = await SelectedAlgorithm.CompressAsync(
@@ -212,9 +211,15 @@ public partial class MainViewModel : ObservableObject {
                 progressReporter,
                 _cancellationTokenSource.Token);
   
-            string outputDpcm = await _audioFileService.SaveCompressedFileAsync(
-                CurrentAudioFile.FilePath, 
-                result.CompressedData);
+            string compressedExtension =
+                GetCompressedFileExtension(
+                    SelectedAlgorithm);
+
+            string outputFile =
+                await _audioFileService.SaveCompressedFileAsync(
+                    CurrentAudioFile.FilePath,
+                    result.CompressedData,
+                    compressedExtension);
   
             var decompressed = SelectedAlgorithm.Decompress(result.CompressedData);
             var reconstructed = decompressed.Samples;
@@ -229,7 +234,7 @@ public partial class MainViewModel : ObservableObject {
             double snr = SignalQualityAnalyzer.ComputeSnrDb(samples, reconstructed);
   
             long originalSize = _audioFileService.GetFileSize(CurrentAudioFile.FilePath);
-            long dpcmSize     = _audioFileService.GetFileSize(outputDpcm);
+            long compressedSize      = _audioFileService.GetFileSize(outputFile);
             var snrStr        = double.IsPositiveInfinity(snr) ? "∞ dB (Lossless)" : $"{snr:F2} dB";
  
             Console.WriteLine("\n========== COMPRESSION RESULTS ==========");
@@ -237,10 +242,10 @@ public partial class MainViewModel : ObservableObject {
             Console.WriteLine($"  Compression Time  : {result.CompressionTime.TotalMilliseconds:F0} ms");
             Console.WriteLine($"  Compression Ratio : {result.CompressionRatio:F2}:1");
             Console.WriteLine($"  Original size     : {originalSize:N0} bytes");
-            Console.WriteLine($"  Compressed size   : {dpcmSize:N0} bytes");
-            Console.WriteLine($"  Space saved       : {(1.0 - (double)dpcmSize / originalSize) * 100:F1}%");
+            Console.WriteLine($"  Compressed size   : {compressedSize:N0} bytes");
+            Console.WriteLine($"  Space saved       : {(1.0 - (double)compressedSize / originalSize) * 100:F1}%");
             Console.WriteLine($"  SNR               : {snrStr}");
-            Console.WriteLine($"  Output .dpcm      : {outputDpcm}");
+            Console.WriteLine($"  Output File       : {outputFile}");
             Console.WriteLine($"  Reconstructed WAV : {reconstructedWav}");
             Console.WriteLine("=========================================\n");
             Console.WriteLine($"[Debug] Original Samples Count   : {samples.Length}");
@@ -286,4 +291,57 @@ public partial class MainViewModel : ObservableObject {
     }
 
     private bool CanReset() => IsAudioLoaded;
+    
+    private CompressionSettings CreateSettingsForAlgorithm(ICompressionAlgorithm algorithm)
+    {
+        if (CurrentAudioFile == null)
+            throw new InvalidOperationException(
+                "No audio file loaded");
+
+        return algorithm switch
+        {
+            DpcmCompressionAlgorithm => new DpcmSettings
+            {
+                SampleRate       = CurrentAudioFile.SampleRate,
+                Channels         = CurrentAudioFile.Channels,
+                BitsPerSample    = CurrentAudioFile.BitsPerSample,
+                QuantizationStep = 8,
+            },
+
+            AdaptiveDeltaModulationCompressionAlgorithm =>
+                new AdaptiveDeltaModulationSettings
+                {
+                    InitialStepSize = 100
+                },
+
+            DeltaModulationCompressionAlgorithm =>
+                new DeltaModulationSettings(),
+
+            NonlinearQuantizationCompressionAlgorithm =>
+                new NonlinearDifferentialCodingSettings
+                {
+                    QuantizationBits = (int)QuantizationLevels
+                },
+
+            PredictiveDifferentialCodingCompressionAlgorithm =>
+                new PredictiveDifferentialCodingSettings(),
+
+            _ => throw new NotSupportedException(
+                $"Algorithm {algorithm.GetType().Name} is not supported")
+        };
+    }
+
+    private string GetCompressedFileExtension(
+        ICompressionAlgorithm algorithm)
+    {
+        return algorithm switch
+        {
+            DpcmCompressionAlgorithm => ".dpcm",
+            AdaptiveDeltaModulationCompressionAlgorithm => ".adm",
+            DeltaModulationCompressionAlgorithm => ".dm",
+            NonlinearQuantizationCompressionAlgorithm => ".nlq",
+            PredictiveDifferentialCodingCompressionAlgorithm => ".pdc",
+            _ => ".compressed"
+        };
+    }
 }
