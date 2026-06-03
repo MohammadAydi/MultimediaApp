@@ -11,11 +11,12 @@ public class AudioFileService
         return extension is ".wav" or ".ogg" or ".mp3";
     }   
  
-    public async Task<string> SaveCompressedFileAsync(string originalPath, byte[] compressedData, string extension)
+    public async Task<string> SaveCompressedFileAsync(string originalPath, byte[] compressedData,
+        string compressedExtension)
     {
-        string outputFile = Path.ChangeExtension(originalPath, extension);
-        await File.WriteAllBytesAsync(outputFile, compressedData);
-        return outputFile;
+        string outputDpcm = Path.ChangeExtension(originalPath, compressedExtension);
+        await File.WriteAllBytesAsync(outputDpcm, compressedData);
+        return outputDpcm;
     }
  
     public async Task<string> SaveReconstructedWavAsync(string originalPath, short[] samples, int sampleRate, int bitsPerSample, int channels)
