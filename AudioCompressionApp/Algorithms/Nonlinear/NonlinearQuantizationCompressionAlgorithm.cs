@@ -6,7 +6,7 @@ using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Models;
 using AudioCompressionApp.Models.Settings;
 
-namespace AudioCompressionApp.Algorithms;
+namespace AudioCompressionApp.Algorithms.Nonlinear;
 
 public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgorithmBase
 {

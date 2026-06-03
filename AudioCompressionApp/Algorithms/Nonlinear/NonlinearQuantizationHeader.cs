@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace AudioCompressionApp.Algorithms;
+namespace AudioCompressionApp.Algorithms.Nonlinear;
 
 public sealed class NonlinearQuantizationHeader
 {
