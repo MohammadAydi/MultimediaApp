@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using AudioCompressionApp.Algorithms;
 using AudioCompressionApp.Algorithms.Base;
+using AudioCompressionApp.Algorithms.Nonlinear;
 using AudioCompressionApp.Models;
 using AudioCompressionApp.Models.Settings;
 using AudioCompressionApp.Services;
