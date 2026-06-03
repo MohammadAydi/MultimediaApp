@@ -123,42 +123,33 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
         int  channels     = header.Channels;
         long totalSamples = header.TotalSampleFrames;
 
-        using var outputStream = new MemoryStream();
-        using var pcmWriter    = new BinaryWriter(outputStream);
 
+        short[] samples = new short[totalSamples];
         var predicted = new int[channels];
 
         short seedSample = binaryReader.ReadInt16();
         for (int ch = 0; ch < channels; ch++)
         {
-            pcmWriter.Write(BitConverter.GetBytes(seedSample));
+            samples[ch]   = seedSample;
             predicted[ch] = seedSample;
         }
 
-        long processed = channels;
-        var  bitReader  = new BitPackReader(binaryReader);
+        int processed = channels; 
+        var bitReader = new BitPackReader(binaryReader);
 
         while (processed < totalSamples)
         {
-            int channel = (int)(processed % channels);
+            int channel = processed % channels;
  
             int quantisedDelta = RiceCoder.Decode(bitReader, riceK);
 
             int reconstructed  = predicted[channel] + quantisedDelta * quantStep;
             reconstructed      = Math.Clamp(reconstructed, short.MinValue, short.MaxValue);
             predicted[channel] = reconstructed;
-
-            pcmWriter.Write(BitConverter.GetBytes((short)reconstructed));
+            
+            samples[processed] = (short)reconstructed;
             processed++;
         }
-
-        pcmWriter.Flush();
-        short[] samples = outputStream
-            .ToArray()
-            .Chunk(2)
-            .Select(b => BitConverter.ToInt16(b))
-            .ToArray();
-
         return new DecompressionResult(
             samples,
             header.SampleRate,
