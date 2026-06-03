@@ -5,32 +5,27 @@ using AudioCompressionApp.Models.Settings;
 
 namespace AudioCompressionApp.Algorithms;
 
-
 public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
-{ 
+{
     private int _quantizationStep;
-    private int _deltaBits;
- 
-    private int   _deltaMin;
-    private int   _deltaMax;
+    private int _riceK;            
+
     private int   _channels;
     private int[] _predicted = Array.Empty<int>();
 
     private MemoryStream?  _outputMemoryStream;
     private BinaryWriter?  _binaryWriter;
     private BitPackWriter? _bitWriter;
-
+ 
     private long _inputBitsTotal;
-    private long _outputBitsWritten;
  
-
     public override string Name => "DPCM";
- 
-    public DpcmCompressionAlgorithm(int quantizationStep = 1, int deltaBits = 8)
+
+    public DpcmCompressionAlgorithm(int quantizationStep = 1 )
     {
         _quantizationStep = quantizationStep;
-        _deltaBits        = deltaBits;
-    } 
+        _riceK            = -1;  
+    }
 
     protected override void Validate(CompressionContext context)
     {
@@ -40,20 +35,19 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
         if (context.Settings is not DpcmSettings)
             throw new InvalidOperationException(
-                $"DPCMCompressionAlgorithm requires DpcmSettings, " +
+                $"DpcmCompressionAlgorithm requires DpcmSettings, " +
                 $"but got: {context.Settings?.GetType().Name ?? "null"}");
     }
 
     protected override void Initialize(CompressionContext context)
     {
         var settings = (DpcmSettings)context.Settings;
- 
-        _quantizationStep = settings.QuantizationStep;
-        _deltaBits        = settings.DeltaBits;
 
-        _deltaMin = -(1 << (_deltaBits - 1));
-        _deltaMax =  (1 << (_deltaBits - 1)) - 1;
-        _channels = settings.Channels;
+        _quantizationStep = settings.QuantizationStep;
+        _channels         = settings.Channels;
+ 
+        _riceK = RiceParameterEstimator.Estimate(
+            context.Samples, _channels, _quantizationStep);
 
         _outputMemoryStream = new MemoryStream();
         _binaryWriter       = new BinaryWriter(_outputMemoryStream);
@@ -65,7 +59,7 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
             BitsPerSample     = settings.BitsPerSample,
             TotalSampleFrames = context.Samples.Length,
             QuantizationStep  = _quantizationStep,
-            DeltaBits         = _deltaBits
+            RiceParameter     = _riceK,
         };
         header.Write(_binaryWriter);
 
@@ -77,13 +71,10 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
             _predicted[ch] = seed;
         }
 
-        _bitWriter         = new BitPackWriter(_binaryWriter);
-        _inputBitsTotal    = (long)context.Samples.Length * 16;
-        _outputBitsWritten = 0;
+        _bitWriter      = new BitPackWriter(_binaryWriter);
+        _inputBitsTotal = (long)context.Samples.Length * 16;
 
-        Console.WriteLine($"[DPCM] quantStep={_quantizationStep}  deltaBits={_deltaBits}" +
-                          $"  deltaRange=[{_deltaMin * _quantizationStep}" +
-                          $"..{_deltaMax * _quantizationStep}]");
+        Console.WriteLine($"[DPCM] quantStep={_quantizationStep}  riceK={_riceK}");
     }
 
     protected override void ProcessSample(int index, CompressionContext context)
@@ -96,10 +87,8 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
         int delta          = currentSample - _predicted[channel];
         int quantisedDelta = (int)Math.Round((double)delta / _quantizationStep);
-        quantisedDelta     = Math.Clamp(quantisedDelta, _deltaMin, _deltaMax);
-
-        _bitWriter!.WriteBits(quantisedDelta, _deltaBits);
-        _outputBitsWritten += _deltaBits;
+ 
+        RiceCoder.Encode(_bitWriter!, quantisedDelta, _riceK);
 
         int reconstructed   = _predicted[channel] + quantisedDelta * _quantizationStep;
         _predicted[channel] = Math.Clamp(reconstructed, short.MinValue, short.MaxValue);
@@ -117,9 +106,9 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
     protected override double CalculateCurrentRatio()
     {
-        if (_outputBitsWritten == 0)
-            return 0.0;
-        return (double)_inputBitsTotal / _outputBitsWritten;
+        long outputBytes = _outputMemoryStream?.Position ?? 0;
+        if (outputBytes == 0) return 0.0;
+        return (double)_inputBitsTotal / (outputBytes * 8);
     }
  
 
@@ -130,7 +119,7 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
         var  header       = DpcmHeader.Read(binaryReader);
         int  quantStep    = header.QuantizationStep;
-        int  deltaBits    = header.DeltaBits;
+        int  riceK        = header.RiceParameter;   
         int  channels     = header.Channels;
         long totalSamples = header.TotalSampleFrames;
 
@@ -151,8 +140,10 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
         while (processed < totalSamples)
         {
-            int channel        = (int)(processed % channels);
-            int quantisedDelta = bitReader.ReadBits(deltaBits);
+            int channel = (int)(processed % channels);
+ 
+            int quantisedDelta = RiceCoder.Decode(bitReader, riceK);
+
             int reconstructed  = predicted[channel] + quantisedDelta * quantStep;
             reconstructed      = Math.Clamp(reconstructed, short.MinValue, short.MaxValue);
             predicted[channel] = reconstructed;

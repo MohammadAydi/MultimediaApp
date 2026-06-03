@@ -11,7 +11,7 @@ internal sealed class DpcmHeader
     public int  BitsPerSample     { get; init; }
     public long TotalSampleFrames { get; init; }
     public int  QuantizationStep  { get; init; }
-    public int  DeltaBits         { get; init; }
+    public int  RiceParameter     { get; init; }   
 
     public void Write(BinaryWriter writer)
     {
@@ -21,7 +21,7 @@ internal sealed class DpcmHeader
         writer.Write(BitsPerSample);
         writer.Write(TotalSampleFrames);
         writer.Write(QuantizationStep);
-        writer.Write(DeltaBits);
+        writer.Write(RiceParameter);
     }
 
     public static DpcmHeader Read(BinaryReader reader)
@@ -38,7 +38,7 @@ internal sealed class DpcmHeader
             BitsPerSample     = reader.ReadInt32(),
             TotalSampleFrames = reader.ReadInt64(),
             QuantizationStep  = reader.ReadInt32(),
-            DeltaBits         = reader.ReadInt32()
+            RiceParameter     = reader.ReadInt32(),
         };
     }
 }
@@ -50,18 +50,19 @@ internal sealed class BitPackWriter(BinaryWriter writer) : IDisposable
 
     public void WriteBits(int value, int bits)
     {
-        ulong masked = (ulong)value & ((1UL << bits) - 1);
-
+        ulong masked   = (ulong)value & ((1UL << bits) - 1);
         _buffer       |= masked << _bitsInBuffer;
         _bitsInBuffer += bits;
 
         while (_bitsInBuffer >= 8)
         {
             writer.Write((byte)(_buffer & 0xFF));
-            _buffer       >>= 8;
-            _bitsInBuffer  -= 8;
+            _buffer      >>= 8;
+            _bitsInBuffer -= 8;
         }
     }
+
+    public void WriteBit(int bit) => WriteBits(bit & 1, 1);
 
     private void Flush()
     {
@@ -85,20 +86,102 @@ internal sealed class BitPackReader(BinaryReader reader)
         {
             if (reader.BaseStream.Position >= reader.BaseStream.Length)
                 break;
-
             _buffer       |= (ulong)reader.ReadByte() << _bitsInBuffer;
             _bitsInBuffer += 8;
         }
 
-        var raw   = _buffer & ((1UL << bits) - 1);
-        _buffer     >>= bits;
+        int value     = (int)(_buffer & ((1UL << bits) - 1));
+        _buffer      >>= bits;
         _bitsInBuffer -= bits;
- 
-        var signBit = 1 << (bits - 1);
-        var value   = (int)raw;
-        if ((value & signBit) != 0)
-            value -= (1 << bits);
-
         return value;
+    }
+
+    public int ReadBit() => ReadBits(1);
+}
+
+
+internal static class RiceCoder
+{ 
+    private const int EscapeThreshold = 64;
+ 
+    public static void Encode(BitPackWriter bpw, int signedValue, int k)
+    { 
+        int n = signedValue >= 0
+            ? signedValue * 2
+            : -signedValue * 2 - 1;
+
+        int quotient  = n >> k;
+        int remainder = n & ((1 << k) - 1);
+
+        if (quotient >= EscapeThreshold)
+        { 
+            for (int i = 0; i < EscapeThreshold; i++)
+                bpw.WriteBit(0);
+            bpw.WriteBit(1);
+            bpw.WriteBits(n, 17);
+        }
+        else
+        { 
+            for (int i = 0; i < quotient; i++)
+                bpw.WriteBit(0);
+            bpw.WriteBit(1);
+ 
+            if (k > 0)
+                bpw.WriteBits(remainder, k);
+        }
+    }
+ 
+    public static int Decode(BitPackReader bpr, int k)
+    { 
+        int quotient = 0;
+        while (bpr.ReadBit() == 0)
+        {
+            quotient++;
+            if (quotient >= EscapeThreshold)
+            { 
+                int rawN = bpr.ReadBits(17);
+                return ZigZagDecode(rawN);
+            }
+        }
+
+        int remainder = k > 0 ? bpr.ReadBits(k) : 0;
+        int n         = (quotient << k) | remainder;
+        return ZigZagDecode(n);
+    }
+ 
+    private static int ZigZagDecode(int n) =>
+        (n & 1) == 0 ? n >> 1 : -(n >> 1) - 1;
+}
+ 
+internal static class RiceParameterEstimator
+{
+    public static int Estimate(short[] samples, int channels, int quantStep)
+    {
+        const int maxProbe = 8_000;
+        int       step     = Math.Max(1, samples.Length / maxProbe);
+
+        var    pred   = new int[channels];
+        double sumAbs = 0;
+        int    count  = 0;
+
+        for (int ch = 0; ch < channels && ch < samples.Length; ch++)
+            pred[ch] = samples[ch];
+
+        for (int i = channels; i < samples.Length; i += step)
+        {
+            int ch    = i % channels;
+            int delta = samples[i] - pred[ch];
+            int q     = (int)Math.Round((double)delta / quantStep);
+            pred[ch]  = Math.Clamp(pred[ch] + q * quantStep,
+                                   short.MinValue, short.MaxValue);
+            sumAbs   += Math.Abs(q);
+            count++;
+        }
+
+        if (count == 0 || sumAbs == 0) return 2;
+
+        double mean = sumAbs / count;
+        int    k    = (int)Math.Round(Math.Log2(mean * 1.4142));
+        return Math.Clamp(k, 0, 8);
     }
 }

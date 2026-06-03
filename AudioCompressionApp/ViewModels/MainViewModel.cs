@@ -203,8 +203,7 @@ public partial class MainViewModel : ObservableObject {
                     SampleRate       = CurrentAudioFile.SampleRate,
                     Channels         = CurrentAudioFile.Channels,
                     BitsPerSample    = CurrentAudioFile.BitsPerSample,
-                    QuantizationStep = 2,
-                    DeltaBits        = 12,
+                    QuantizationStep = 8,
                 }
             };
  
