@@ -223,7 +223,7 @@ public partial class MainViewModel : ObservableObject {
                 CurrentAudioFile.FilePath,
                 reconstructed,
                 CurrentAudioFile.SampleRate,
-                CurrentAudioFile.BitsPerSample,
+                16, //مهمة ة ة ة ة
                 CurrentAudioFile.Channels);
  
             double snr = SignalQualityAnalyzer.ComputeSnrDb(samples, reconstructed);
@@ -243,7 +243,9 @@ public partial class MainViewModel : ObservableObject {
             Console.WriteLine($"  Output .dpcm      : {outputDpcm}");
             Console.WriteLine($"  Reconstructed WAV : {reconstructedWav}");
             Console.WriteLine("=========================================\n");
-
+            Console.WriteLine($"[Debug] Original Samples Count   : {samples.Length}");
+            Console.WriteLine($"[Debug] Reconstructed Samples Count: {reconstructed.Length}");
+            Console.WriteLine($"[Debug] Audio Channels Count       : {CurrentAudioFile.Channels}");
             AddLog($"Done — Ratio: {result.CompressionRatio:F2}:1 | SNR: {(double.IsPositiveInfinity(snr) ? "∞" : $"{snr:F2}")} dB");
         }
         catch (OperationCanceledException) {
