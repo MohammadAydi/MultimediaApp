@@ -248,11 +248,7 @@ public partial class MainViewModel : ObservableObject {
             Console.WriteLine($"  SNR               : {snrStr}");
             Console.WriteLine($"  Output File       : {outputFile}");
             Console.WriteLine($"  Reconstructed WAV : {reconstructedWav}");
-            Console.WriteLine("=========================================\n");
-            Console.WriteLine($"[Debug] Original Samples Count   : {samples.Length}");
-            Console.WriteLine($"[Debug] Reconstructed Samples Count: {reconstructed.Length}");
-            Console.WriteLine($"[Debug] Audio Channels Count       : {CurrentAudioFile.Channels}");
-            AddLog($"Done — Ratio: {result.CompressionRatio:F2}:1 | SNR: {(double.IsPositiveInfinity(snr) ? "∞" : $"{snr:F2}")} dB");
+            Console.WriteLine("=========================================\n"); 
         }
         catch (OperationCanceledException) {
             AddLog("Compression canceled");
@@ -307,6 +303,7 @@ public partial class MainViewModel : ObservableObject {
                 Channels         = CurrentAudioFile.Channels,
                 BitsPerSample    = CurrentAudioFile.BitsPerSample,
                 QuantizationStep = 8,
+                PredictorOrder=2
             },
 
             AdaptiveDeltaModulationCompressionAlgorithm =>
