@@ -126,12 +126,12 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
 
         short[] samples = new short[totalSamples];
         var predicted = new int[channels];
-
-        short seedSample = binaryReader.ReadInt16();
+        
         for (int ch = 0; ch < channels; ch++)
         {
-            samples[ch]   = seedSample;
-            predicted[ch] = seedSample;
+            short seed    = binaryReader.ReadInt16();
+            samples[ch]   = seed;
+            predicted[ch] = seed;
         }
 
         int processed = channels; 
