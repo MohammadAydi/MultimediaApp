@@ -1,47 +1,122 @@
-<ResourceDictionary
-    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
-    <Color x:Key="BackgroundColor">
-        #1E1E1E
-    </Color>
+    <!-- =====================================================
+         DESIGN TOKENS — DARK AUDIO WORKSTATION THEME
+         All colors, sizes, and radii live here.
+         Reference these everywhere; never hardcode values.
+    ====================================================== -->
 
-    <Color x:Key="SurfaceColor">
-        #2D2D30
-    </Color>
+    <!-- Core palette -->
+    <Color x:Key="Clr.Canvas">#0D0F14</Color>
+    <Color x:Key="Clr.Surface">#13161E</Color>
+    <Color x:Key="Clr.SurfaceRaised">#1A1E28</Color>
+    <Color x:Key="Clr.SurfaceHighlight">#22283A</Color>
+    <Color x:Key="Clr.Border">#2A3147</Color>
+    <Color x:Key="Clr.BorderSubtle">#1F2535</Color>
 
-    <Color x:Key="SurfaceLightColor">
-        #35363A
-    </Color>
+    <!-- Accent — electric teal/cyan -->
+    <Color x:Key="Clr.Accent">#00D4FF</Color>
+    <Color x:Key="Clr.AccentDim">#00A3C4</Color>
+    <Color x:Key="Clr.AccentGlow">#1A4A5A</Color>
+    <Color x:Key="Clr.AccentMuted">#0E2D38</Color>
 
-    <Color x:Key="PrimaryColor">
-        #4CC2FF
-    </Color>
+    <!-- Secondary accent — warm amber for warnings/progress -->
+    <Color x:Key="Clr.Amber">#F0A030</Color>
+    <Color x:Key="Clr.AmberDim">#A06A1A</Color>
+    <Color x:Key="Clr.AmberMuted">#2A1E08</Color>
 
-    <Color x:Key="TextColor">
-        White
-    </Color>
+    <!-- Status -->
+    <Color x:Key="Clr.Success">#22C55E</Color>
+    <Color x:Key="Clr.SuccessMuted">#0A2A18</Color>
+    <Color x:Key="Clr.Danger">#EF4444</Color>
+    <Color x:Key="Clr.DangerMuted">#2A0A0A</Color>
 
-    <Color x:Key="SecondaryTextColor">
-        #AAAAAA
-    </Color>
+    <!-- Text hierarchy -->
+    <Color x:Key="Clr.TextPrimary">#F0F4FF</Color>
+    <Color x:Key="Clr.TextSecondary">#8892AA</Color>
+    <Color x:Key="Clr.TextMuted">#4A5470</Color>
+    <Color x:Key="Clr.TextDisabled">#2E3550</Color>
 
-    <SolidColorBrush x:Key="BackgroundBrush"
-                     Color="{StaticResource BackgroundColor}"/>
+    <!-- =====================================================
+         SOLID COLOR BRUSHES
+    ====================================================== -->
+    <SolidColorBrush x:Key="Brush.Canvas"           Color="{StaticResource Clr.Canvas}" />
+    <SolidColorBrush x:Key="Brush.Surface"          Color="{StaticResource Clr.Surface}" />
+    <SolidColorBrush x:Key="Brush.SurfaceRaised"    Color="{StaticResource Clr.SurfaceRaised}" />
+    <SolidColorBrush x:Key="Brush.SurfaceHighlight" Color="{StaticResource Clr.SurfaceHighlight}" />
+    <SolidColorBrush x:Key="Brush.Border"           Color="{StaticResource Clr.Border}" />
+    <SolidColorBrush x:Key="Brush.BorderSubtle"     Color="{StaticResource Clr.BorderSubtle}" />
 
-    <SolidColorBrush x:Key="SurfaceBrush"
-                     Color="{StaticResource SurfaceColor}"/>
+    <SolidColorBrush x:Key="Brush.Accent"      Color="{StaticResource Clr.Accent}" />
+    <SolidColorBrush x:Key="Brush.AccentDim"   Color="{StaticResource Clr.AccentDim}" />
+    <SolidColorBrush x:Key="Brush.AccentGlow"  Color="{StaticResource Clr.AccentGlow}" />
+    <SolidColorBrush x:Key="Brush.AccentMuted" Color="{StaticResource Clr.AccentMuted}" />
 
-    <SolidColorBrush x:Key="SurfaceLightBrush"
-                     Color="{StaticResource SurfaceLightColor}"/>
+    <SolidColorBrush x:Key="Brush.Amber"      Color="{StaticResource Clr.Amber}" />
+    <SolidColorBrush x:Key="Brush.AmberDim"   Color="{StaticResource Clr.AmberDim}" />
+    <SolidColorBrush x:Key="Brush.AmberMuted" Color="{StaticResource Clr.AmberMuted}" />
 
-    <SolidColorBrush x:Key="PrimaryBrush"
-                     Color="{StaticResource PrimaryColor}"/>
+    <SolidColorBrush x:Key="Brush.Success"      Color="{StaticResource Clr.Success}" />
+    <SolidColorBrush x:Key="Brush.SuccessMuted" Color="{StaticResource Clr.SuccessMuted}" />
+    <SolidColorBrush x:Key="Brush.Danger"       Color="{StaticResource Clr.Danger}" />
+    <SolidColorBrush x:Key="Brush.DangerMuted"  Color="{StaticResource Clr.DangerMuted}" />
 
-    <SolidColorBrush x:Key="TextBrush"
-                     Color="{StaticResource TextColor}"/>
+    <SolidColorBrush x:Key="Brush.TextPrimary"   Color="{StaticResource Clr.TextPrimary}" />
+    <SolidColorBrush x:Key="Brush.TextSecondary" Color="{StaticResource Clr.TextSecondary}" />
+    <SolidColorBrush x:Key="Brush.TextMuted"     Color="{StaticResource Clr.TextMuted}" />
+    <SolidColorBrush x:Key="Brush.TextDisabled"  Color="{StaticResource Clr.TextDisabled}" />
 
-    <SolidColorBrush x:Key="SecondaryTextBrush"
-                     Color="{StaticResource SecondaryTextColor}"/>
+    <!-- =====================================================
+         GRADIENT BRUSHES
+    ====================================================== -->
+    <!-- Subtle top-edge accent line for panels -->
+    <LinearGradientBrush x:Key="Brush.AccentTopEdge" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#0000D4FF" Offset="0.0" />
+        <GradientStop Color="#8000D4FF" Offset="0.3" />
+        <GradientStop Color="#8000D4FF" Offset="0.7" />
+        <GradientStop Color="#0000D4FF" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <!-- Progress bar fill gradient -->
+    <LinearGradientBrush x:Key="Brush.ProgressFill" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="{StaticResource Clr.AccentDim}" Offset="0.0" />
+        <GradientStop Color="{StaticResource Clr.Accent}"    Offset="1.0" />
+    </LinearGradientBrush>
+
+    <!-- Drop zone drag-over highlight -->
+    <LinearGradientBrush x:Key="Brush.DropZoneActive" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#0A00D4FF" Offset="0.0" />
+        <GradientStop Color="#1800D4FF" Offset="1.0" />
+    </LinearGradientBrush>
+
+    <!-- =====================================================
+         CORNER RADII
+    ====================================================== -->
+    <CornerRadius x:Key="Radius.Small">4</CornerRadius>
+    <CornerRadius x:Key="Radius.Medium">8</CornerRadius>
+    <CornerRadius x:Key="Radius.Large">12</CornerRadius>
+    <CornerRadius x:Key="Radius.XLarge">16</CornerRadius>
+    <CornerRadius x:Key="Radius.Pill">999</CornerRadius>
+
+    <!-- =====================================================
+         FONT SIZES
+    ====================================================== -->
+    <sys:Double x:Key="FontSize.XSmall">10</sys:Double>
+    <sys:Double x:Key="FontSize.Small">11</sys:Double>
+    <sys:Double x:Key="FontSize.Body">13</sys:Double>
+    <sys:Double x:Key="FontSize.Medium">14</sys:Double>
+    <sys:Double x:Key="FontSize.Large">16</sys:Double>
+    <sys:Double x:Key="FontSize.XLarge">20</sys:Double>
+    <sys:Double x:Key="FontSize.Display">28</sys:Double>
+
+    <!-- =====================================================
+         SPACING / THICKNESS
+    ====================================================== -->
+    <Thickness x:Key="Spacing.Card">20</Thickness>
+    <Thickness x:Key="Spacing.CardHorizontal">20,0</Thickness>
+    <Thickness x:Key="Spacing.Section">0,0,0,16</Thickness>
+    <Thickness x:Key="Spacing.InlineGap">8,0,0,0</Thickness>
 
 </ResourceDictionary>

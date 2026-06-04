@@ -1,11 +1,14 @@
 namespace AudioCompressionApp.Algorithms.ADM;
 
 public class AdmHeader {
+    public static readonly byte[] MagicNumber = "ADM1"u8.ToArray();
+    public const string StringMagicNumber = "ADM1";
+
     public int SampleRate { get; set; }
 
-    public short Channels { get; set; }
+    public int Channels { get; set; }
 
-    public short BitsPerSample { get; set; }
+    public int BitsPerSample { get; set; }
 
     public int SampleCount { get; set; }
 

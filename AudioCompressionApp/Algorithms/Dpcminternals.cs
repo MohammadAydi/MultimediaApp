@@ -4,7 +4,8 @@ namespace AudioCompressionApp.Algorithms;
 
 internal sealed class DpcmHeader
 {
-    private static readonly byte[] Magic = "DPCM"u8.ToArray();
+    private static readonly byte[] MagicNumber = "DPCM"u8.ToArray();
+    public const string StringMagicNumber = "DPCM";
 
     public int  SampleRate        { get; init; }
     public int  Channels          { get; init; }
@@ -16,7 +17,7 @@ internal sealed class DpcmHeader
 
     public void Write(BinaryWriter writer)
     {
-        writer.Write(Magic);
+        writer.Write(MagicNumber);
         writer.Write(SampleRate);
         writer.Write(Channels);
         writer.Write(BitsPerSample);
@@ -29,8 +30,7 @@ internal sealed class DpcmHeader
     public static DpcmHeader Read(BinaryReader reader)
     {
         byte[] magic = reader.ReadBytes(4);
-        if (magic[0] != Magic[0] || magic[1] != Magic[1] ||
-            magic[2] != Magic[2] || magic[3] != Magic[3])
+        if (!magic.AsSpan().SequenceEqual(MagicNumber))
             throw new InvalidDataException("Not a valid DPCM file: magic bytes mismatch.");
 
         return new DpcmHeader

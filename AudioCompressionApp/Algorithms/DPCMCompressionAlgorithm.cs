@@ -22,6 +22,7 @@ public sealed class DpcmCompressionAlgorithm : CompressionAlgorithmBase
     private long _inputBitsTotal;
  
     public override string Name => "DPCM";
+    public override string Extension => "dpcmKasem";
 
     public DpcmCompressionAlgorithm(int quantizationStep = 1 )
     {

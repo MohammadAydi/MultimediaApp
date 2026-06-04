@@ -17,24 +17,60 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
 
     public override string Name => "Adaptive Delta Modulation";
+    public override string Extension => "admAydi";
+
+    private readonly Dictionary<int, int> _diffHistogram = new();
 
     protected override void ProcessSample(int index, CompressionContext context) {
         short sample = context.Samples[index];
-        bool bit = sample >= _reconstructed;
+        if (index > 0) {
+            int previous = context.Samples[index - 1];
+
+            int diff = Math.Abs(sample - previous);
+
+            // Bucket size = 100
+            int bucket = (diff / 100) * 100;
+
+            _diffHistogram.TryAdd(bucket, 0);
+            _diffHistogram[bucket]++;
+        }
+
+
+        // Current estimate before decision
+        double estimate = _reconstructed;
+
+        // Error
+        double error = sample - estimate;
+
+        // Quantizer decision
+        bool bit = error >= 0;
+
+        // Transmitted value (+Δ or -Δ)
+        double transmitted = bit ? _stepSize : -_stepSize;
+
+        // Update accumulator
+        _reconstructed += transmitted;
+
         _encodedBits.Add(bit);
-        if (bit)
-            _reconstructed += _stepSize;
-        else
-            _reconstructed -= _stepSize;
+
+        // Console.WriteLine(
+        //     $"[{index}] " +
+        //     $"Input={sample}, " +
+        //     $"Estimate={estimate}, " +
+        //     $"Error={error}, " +
+        //     $"Bit={(bit ? 1 : 0)}, " +
+        //     $"Transmit={transmitted}, " +
+        //     $"UpdatedEstimate={_reconstructed}");
     }
 
     protected override double CalculateCurrentRatio() {
-        throw new NotImplementedException();
+        return 1.0;
     }
 
     protected override void Initialize(CompressionContext context) {
         _context = context;
         _settings = (AdaptiveDeltaModulationSettings)context.Settings;
+
         _encodedBits.Clear();
         CompressedData = [];
         _reconstructed = 0;
@@ -45,9 +81,9 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         byte[] payload = AdmBitPacker.PackBits(_encodedBits);
         AdmHeader header =
             new() {
-                SampleRate = _context.SampleRate,
-                Channels = _context.Channels,
-                BitsPerSample = _context.BitsPerSample,
+                SampleRate = _context.Settings.SampleRate,
+                Channels = _context.Settings.Channels,
+                BitsPerSample = _context.Settings.BitsPerSample,
 
                 SampleCount =
                     _context!.Samples.Length,
@@ -57,6 +93,28 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
             };
 
         CompressedData = AdmFileWriter.Write(header, payload);
+
+        Console.WriteLine("=== Top 20 Most Common Differences ===");
+
+        foreach (var kv in _diffHistogram
+                     .OrderByDescending(x => x.Value)
+                     .Take(20)) {
+            Console.WriteLine(
+                $"{kv.Key,6} - {kv.Key + 99,6} : {kv.Value}");
+        }
+
+        int maxDiff = _diffHistogram.Keys.Max();
+
+        Console.WriteLine($"Max Diff = {maxDiff}");
+
+        long total =
+            _diffHistogram.Sum(x => (long)x.Key * x.Value);
+
+        long count =
+            _diffHistogram.Sum(x => x.Value);
+
+        Console.WriteLine(
+            $"Average Diff ≈ {(double)total / count:F2}");
     }
 
     public override DecompressionResult Decompress(
@@ -70,6 +128,8 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
             header.InitialStepSize;
 
         for (int i = 0; i < bits.Count; i++) {
+            double previousReconstructed = reconstructed;
+
             if (bits[i]) {
                 reconstructed += stepSize;
             }
@@ -77,11 +137,16 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
                 reconstructed -= stepSize;
             }
 
-            samples[i] =
-                (short)Math.Clamp(
-                    reconstructed,
-                    short.MinValue,
-                    short.MaxValue);
+            // Console.WriteLine(
+            //     $"[{i}] " +
+            //     $"Bit={(bits[i] ? 1 : 0)}, " +
+            //     $"PreviousEstimate={previousReconstructed}, " +
+            //     $"UpdatedEstimate={reconstructed}");
+
+            samples[i] = (short)Math.Clamp(
+                reconstructed,
+                short.MinValue,
+                short.MaxValue);
         }
 
         return new DecompressionResult(samples, header.SampleRate, header.Channels, header.BitsPerSample);

@@ -9,6 +9,8 @@ public static class AdmFileWriter {
         using MemoryStream ms = new();
         using BinaryWriter writer = new(ms);
 
+
+        writer.Write(AdmHeader.MagicNumber);
         writer.Write(header.SampleRate);
         writer.Write(header.Channels);
         writer.Write(header.BitsPerSample);
@@ -32,10 +34,15 @@ public static class AdmFileReader {
         using BinaryReader reader =
             new(ms);
 
+        byte[] magicNumber = reader.ReadBytes(4);
+        if (!magicNumber.AsSpan().SequenceEqual(AdmHeader.MagicNumber)) {
+            throw new InvalidDataException("Invalid ADM file.");
+        }
+
         AdmHeader header = new() {
             SampleRate = reader.ReadInt32(),
-            Channels = reader.ReadInt16(),
-            BitsPerSample = reader.ReadInt16(),
+            Channels = reader.ReadInt32(),
+            BitsPerSample = reader.ReadInt32(),
             SampleCount = reader.ReadInt32(),
             InitialStepSize = reader.ReadDouble()
         };
@@ -54,9 +61,11 @@ public static class AdmBitPacker {
     public static byte[] PackBits(IReadOnlyList<bool> bits) {
         int byteCount = (bits.Count + 7) / 8;
         byte[] result = new byte[byteCount];
-        
+
         for (int i = 0; i < bits.Count; i++) {
-            result[i / 8] |= (byte)(1 << (i % 8));
+            if (bits[i]) {
+                result[i / 8] |= (byte)(1 << (i % 8));
+            }
         }
 
         return result;

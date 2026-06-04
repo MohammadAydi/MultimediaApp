@@ -1,7 +1,7 @@
 namespace AudioCompressionApp.Models;
 
 public class DecompressionResult {
-    public DecompressionResult(short[] samples, int sampleRate, short channels, short bitsPerSample) {
+    public DecompressionResult(short[] samples, int sampleRate, int channels, int bitsPerSample) {
         Samples = samples;
         SampleRate = sampleRate;
         Channels = channels;
@@ -12,7 +12,7 @@ public class DecompressionResult {
 
     public int SampleRate { get; set; }
 
-    public short Channels { get; set; }
+    public int Channels { get; set; }
 
-    public short BitsPerSample { get; set; }
+    public int BitsPerSample { get; set; }
 }

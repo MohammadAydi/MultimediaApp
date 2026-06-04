@@ -5,6 +5,7 @@ namespace AudioCompressionApp.Algorithms;
 
 public class PredictiveDifferentialCodingCompressionAlgorithm : CompressionAlgorithmBase{
     public override string Name => "Predictive Differential Coding";
+    public override string Extension => "pdcManar";
     protected override void ProcessSample(int index, CompressionContext context) {
         throw new NotImplementedException();
     }

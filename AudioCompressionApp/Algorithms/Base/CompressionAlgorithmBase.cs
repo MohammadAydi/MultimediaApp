@@ -1,10 +1,12 @@
 using System.Diagnostics;
 using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Models;
+using AudioCompressionApp.Services;
 
 public abstract class CompressionAlgorithmBase
     : ICompressionAlgorithm {
     public abstract string Name { get; }
+    public abstract string Extension { get; }
 
     protected byte[] CompressedData = [];
 
@@ -13,7 +15,7 @@ public abstract class CompressionAlgorithmBase
         IProgress<CompressionProgressModel> progress,
         CancellationToken cancellationToken) {
         Validate(context);
-
+        
         Initialize(context);
 
         Stopwatch stopwatch = Stopwatch.StartNew();

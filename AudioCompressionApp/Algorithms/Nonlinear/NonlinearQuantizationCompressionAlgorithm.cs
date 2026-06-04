@@ -18,6 +18,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
     private List<int> _quantized = new();
 
     public override string Name => "Nonlinear Quantization (μ-law)";
+    public override string Extension => "nlqAlaa";
 
     protected override void Validate(CompressionContext context)
     {
@@ -109,9 +110,9 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
 
         var header = new NonlinearQuantizationHeader
         {
-            SampleRate = _context.SampleRate,
-            Channels = _context.Channels,
-            BitsPerSample = _context.BitsPerSample,
+            SampleRate = _context.Settings.SampleRate,
+            Channels = _context.Settings.Channels,
+            BitsPerSample = _context.Settings.BitsPerSample,
             SampleCount = _context.Samples.Length,
             QuantizationBits = _settings.QuantizationBits
         };
