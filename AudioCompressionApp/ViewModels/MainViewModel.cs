@@ -6,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using AudioCompressionApp.Algorithms;
+using AudioCompressionApp.Algorithms.ADM;
+using AudioCompressionApp.Algorithms.ADM.Filters;
 using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Algorithms.Nonlinear;
 using AudioCompressionApp.Models;
@@ -59,7 +61,6 @@ public partial class MainViewModel : ObservableObject {
             new AdaptiveDeltaModulationCompressionAlgorithm(),
             new DeltaModulationCompressionAlgorithm(),
             new NonlinearQuantizationCompressionAlgorithm(),
-            new PredictiveDifferentialCodingCompressionAlgorithm(),
         ];
 
         // Wire the tree's file-selection callback to our routing method.
@@ -464,6 +465,76 @@ public partial class MainViewModel : ObservableObject {
             CompressionResult result = await SelectedAlgorithm.CompressAsync(
                 context, progressReporter, _cancellationTokenSource.Token);
 
+            IDecodingAlgo decodingAlgo = new AdmDecodingAlgo();
+            DecompressionResult decompressed = await decodingAlgo.DecompressAsync(
+                result.CompressedData,
+                progressReporter,
+                _cancellationTokenSource.Token);
+
+            // ── SNR comparison across all low-pass filter variants ────────────────
+            int sampleRate = decompressed.SampleRate;
+
+            IAdmLowPassFilter[] filters = [
+                AdmLowPassFilters.None(),
+
+                AdmLowPassFilters.MovingAverage(radius: 2),
+                AdmLowPassFilters.MovingAverage(radius: 4),
+
+                AdmLowPassFilters.IirFirstOrder(alpha: 0.05),
+                AdmLowPassFilters.IirFirstOrder(alpha: 0.1),
+                AdmLowPassFilters.IirFirstOrder(alpha: 0.3),
+                AdmLowPassFilters.IirFirstOrderFromCutoff(3400, sampleRate),
+
+                AdmLowPassFilters.IirCascaded(alpha: 0.2, stages: 2),
+                AdmLowPassFilters.IirCascaded(alpha: 0.25, stages: 3),
+
+                AdmLowPassFilters.Butterworth(cutoffHz: 3000, sampleRate: sampleRate),
+                AdmLowPassFilters.Butterworth(cutoffHz: 4000, sampleRate: sampleRate),
+                AdmLowPassFilters.Butterworth(cutoffHz: 6000, sampleRate: sampleRate),
+            ];
+
+            AddLog("─────────────────────────────────────────────────────");
+            AddLog($"{"Filter",-50} {"SNR (dB)",10}");
+            AddLog("─────────────────────────────────────────────────────");
+
+            double bestSnr = double.MinValue;
+            string bestFilterName = "";
+
+            foreach (IAdmLowPassFilter filter in filters) {
+                short[] filtered = filter.Apply(decompressed.Samples);
+
+                double snr = SignalQualityAnalyzer.ComputeSnrDb(samples, filtered);
+
+                string line = $"{filter.Name,-50} {snr,10:F2} dB";
+                AddLog(line);
+                Console.WriteLine(line);
+
+                // Save WAV
+                string safeName = string.Concat(
+                    filter.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+
+                string outputFolder =
+                    AudioFileService.GetOutputFolder(CurrentAudioFile.FilePath);
+                string wavPath = Path.Combine(
+                    outputFolder,
+                    $"{safeName}.wav");
+
+                await _audioFileService.SaveSamplesAsWaveAsync(
+                    filtered,
+                    sampleRate,
+                    Path.Combine(outputFolder, $"{safeName}.wav"));
+
+                if (snr > bestSnr) {
+                    bestSnr = snr;
+                    bestFilterName = filter.Name;
+                }
+            }
+
+            AddLog("─────────────────────────────────────────────────────");
+            AddLog($"★ Best: {bestFilterName}  →  {bestSnr:F2} dB");
+            Console.WriteLine($"★ Best: {bestFilterName}  →  {bestSnr:F2} dB");
+            // ─────────────────────────────────────────────────────────────────────
+
             string? fileName = SaveCompressedFile();
             await _audioFileService.SaveBytesToFileAsync(fileName, result.CompressedData);
 
@@ -527,22 +598,20 @@ public partial class MainViewModel : ObservableObject {
     private async Task DecompressAsync() {
         if (CompressedFileInfo is null) return;
 
-        IsDecompressing        = true;
-        DecompressionProgress  = 0;
-        DecompressionSpeed     = "—";
+        IsDecompressing = true;
+        DecompressionProgress = 0;
+        DecompressionSpeed = "—";
         FinalDecompressionTime = "—";
 
         _cancellationTokenSource = new CancellationTokenSource();
 
-        var progressReporter = new Progress<CompressionProgressModel>(model =>
-        {
+        var progressReporter = new Progress<CompressionProgressModel>(model => {
             DecompressionProgress = model.Progress;
-            DecompressionSpeed    = $"{model.ProcessingSpeed:F0} samples/s";
+            DecompressionSpeed = $"{model.ProcessingSpeed:F0} samples/s";
         });
 
         AddLog("Decompression started");
-        try
-        {
+        try {
             byte[] fileBytes = await _audioFileService.GetFileBytes(CompressedFileInfo.FilePath);
             string magic = await _audioFileService.GetMagicName(CompressedFileInfo.FilePath);
             IDecodingAlgo decodingAlgo = DecodingAlgorithmFactory.Create(magic);
@@ -552,30 +621,27 @@ public partial class MainViewModel : ObservableObject {
                 _cancellationTokenSource.Token);
 
             FinalDecompressionTime = $"{result.DecompressionTime.TotalMilliseconds:F0} ms";
-            DecompressionProgress  = 100;
+            DecompressionProgress = 100;
 
-            byte[]  wav      = WaveFileBuilder.CreateWaveFile(result);
+            byte[] wav = WaveFileBuilder.CreateWaveFile(result);
             string? filePath = SaveDecompressedFile();
             await _audioFileService.SaveBytesToFileAsync(filePath, wav);
 
             AddLog($"Decompression complete — {FinalDecompressionTime}");
         }
-        catch (OperationCanceledException)
-        {
-            DecompressionProgress  = 0;
-            DecompressionSpeed     = "—";
+        catch (OperationCanceledException) {
+            DecompressionProgress = 0;
+            DecompressionSpeed = "—";
             FinalDecompressionTime = "—";
             AddLog("Decompression cancelled");
         }
-        catch (Exception ex)
-        {
+        catch (Exception ex) {
             AddLog($"Error: {ex.Message}");
             MessageBox.Show($"Decompression failed: {ex.Message}", "Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Console.WriteLine($"[ERROR] {ex}");
         }
-        finally
-        {
+        finally {
             IsDecompressing = false;
         }
     }
@@ -681,12 +747,6 @@ public partial class MainViewModel : ObservableObject {
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
                     QuantizationBits = (int)QuantizationLevels,
-                },
-            PredictiveDifferentialCodingCompressionAlgorithm =>
-                new PredictiveDifferentialCodingSettings {
-                    SampleRate = CurrentAudioFile.SampleRate,
-                    Channels = CurrentAudioFile.Channels,
-                    BitsPerSample = CurrentAudioFile.BitsPerSample,
                 },
             _ => throw new NotSupportedException(
                 $"Algorithm {algorithm.GetType().Name} is not supported"),

@@ -1,20 +1,12 @@
 namespace AudioCompressionApp.Models;
 
-public record DecompressionResult {
-    public DecompressionResult(short[] samples, int sampleRate, int channels, int bitsPerSample ) {
-        Samples = samples;
-        SampleRate = sampleRate;
-        Channels = channels;
-        BitsPerSample = bitsPerSample;
-        
-    }
+public record DecompressionResult(short[] Samples, int SampleRate, int Channels, int BitsPerSample) {
+    public short[] Samples { get; set; } = Samples;
 
-    public short[] Samples { get; set; }
+    public int SampleRate { get; set; } = SampleRate;
 
-    public int SampleRate { get; set; }
+    public int Channels { get; set; } = Channels;
 
-    public int Channels { get; set; }
-
-    public int BitsPerSample { get; set; }
+    public int BitsPerSample { get; set; } = BitsPerSample;
     public TimeSpan DecompressionTime { get; init; }
 }

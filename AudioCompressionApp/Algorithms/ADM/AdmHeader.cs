@@ -13,6 +13,11 @@ public class AdmHeader {
     public int SampleCount { get; set; }
 
     public double InitialStepSize { get; set; }
+
+    public double StepIncreaseFactor { get; set; }
+    public double StepDecreaseFactor { get; set; }
+    public double ConstFactor { get; set; }
+    public short InitialPredictor { get; set; }
 }
 //     +-------------------+
 //     | SampleRate        | 4 bytes

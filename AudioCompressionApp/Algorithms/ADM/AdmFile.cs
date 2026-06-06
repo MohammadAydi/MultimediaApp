@@ -16,6 +16,10 @@ public static class AdmFileWriter {
         writer.Write(header.BitsPerSample);
         writer.Write(header.SampleCount);
         writer.Write(header.InitialStepSize);
+        writer.Write(header.InitialPredictor);
+        writer.Write(header.StepIncreaseFactor);
+        writer.Write(header.StepDecreaseFactor);
+        writer.Write(header.ConstFactor);
         writer.Write(payload.Length);
         writer.Write(payload);
 
@@ -44,8 +48,24 @@ public static class AdmFileReader {
             Channels = reader.ReadInt32(),
             BitsPerSample = reader.ReadInt32(),
             SampleCount = reader.ReadInt32(),
-            InitialStepSize = reader.ReadDouble()
+            InitialStepSize = reader.ReadDouble(),
+            InitialPredictor = reader.ReadInt16(),
+            StepIncreaseFactor = reader.ReadDouble(),
+            StepDecreaseFactor = reader.ReadDouble(),
+            ConstFactor = reader.ReadDouble(),
         };
+
+        Console.WriteLine("=== ADM Header ===");
+        Console.WriteLine($"SampleRate         : {header.SampleRate}");
+        Console.WriteLine($"Channels           : {header.Channels}");
+        Console.WriteLine($"BitsPerSample      : {header.BitsPerSample}");
+        Console.WriteLine($"SampleCount        : {header.SampleCount}");
+        Console.WriteLine($"InitialStepSize    : {header.InitialStepSize}");
+        Console.WriteLine($"InitialPredictor   : {header.InitialPredictor}");
+        Console.WriteLine($"StepIncreaseFactor : {header.StepIncreaseFactor}");
+        Console.WriteLine($"StepDecreaseFactor : {header.StepDecreaseFactor}");
+        Console.WriteLine($"ConstFactor        : {header.ConstFactor}");
+        Console.WriteLine("==================");
 
         int payloadLength =
             reader.ReadInt32();

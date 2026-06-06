@@ -5,8 +5,11 @@ namespace AudioCompressionApp.Algorithms.ADM;
 
 public class AdmDecodingAlgo : DecodingAlgoBase {
     private AdmHeader _header;
-    private double _reconstructed = 0;
+    private double _reconstructed;
     private List<bool> _encodedBits = [];
+    private double _stepSize;
+    private bool? _previousBit;
+
     public override string Name => "Adaptive Delta Modulation";
 
     public override DecompressionResult Decompress(
@@ -48,19 +51,23 @@ public class AdmDecodingAlgo : DecodingAlgoBase {
         var (header, payload) = AdmFileReader.Read(compressedData);
         _header = header;
         _encodedBits = AdmBitPacker.UnpackBits(payload, header.SampleCount);
+        _stepSize = header.InitialStepSize;
+        _previousBit = null;
+        _reconstructed = _header.InitialPredictor;
         return header.SampleCount;
     }
 
     protected override void DecodeSample(long index) {
         if (_encodedBits[(int)index])
-            _reconstructed += _header.InitialStepSize;
+            _reconstructed += _stepSize;
         else
-            _reconstructed -= _header.InitialStepSize;
+            _reconstructed -= _stepSize;
 
         DecompressedSamples[index] = (short)Math.Clamp(
             _reconstructed,
             short.MinValue,
             short.MaxValue);
+        AdaptStepSize(_encodedBits[(int)index]);
     }
 
     protected override DecompressionResult BuildDecompressionResult()
@@ -68,4 +75,22 @@ public class AdmDecodingAlgo : DecodingAlgoBase {
             _header.SampleRate,
             _header.Channels,
             _header.BitsPerSample);
+
+    private void AdaptStepSize(
+        bool currentBit) {
+        if (_previousBit == null) {
+            _previousBit = currentBit;
+            return;
+        }
+
+        if (_previousBit == currentBit) {
+            _stepSize = _stepSize * _header.StepIncreaseFactor;
+        }
+        else if (_previousBit != currentBit) {
+            // _stepSize = _stepSize * _header.StepDecreaseFactor - _header.ConstFactor;
+            _stepSize = _header.InitialStepSize;
+        }
+
+        _previousBit = currentBit;
+    }
 }

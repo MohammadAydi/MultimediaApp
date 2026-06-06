@@ -7,7 +7,7 @@ namespace AudioCompressionApp.Algorithms;
 
 public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmBase {
     private List<bool> _encodedBits = [];
-    private double _reconstructed = 0;
+    private double _reconstructed;
 
     private double _stepSize;
     private bool? _previousBit;
@@ -16,8 +16,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
     private CompressionContext? _context;
 
-    
-    
+
     public long BitsWritten { get; private set; }
     private int _processedSamples;
 
@@ -60,6 +59,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
         _encodedBits.Add(bit);
         BitsWritten++;
+        AdaptStepSize(bit);
 
         // Console.WriteLine(
         //     $"[{index}] " +
@@ -78,6 +78,14 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
             return;
         }
 
+        if (_previousBit == currentBit) {
+            _stepSize = _stepSize * _settings.StepIncreaseFactor;
+        }
+       
+        else if (_previousBit != currentBit) {
+            // _stepSize = _stepSize * _settings.StepDecreaseFactor - _settings.constFactor;
+            _stepSize = _settings.InitialStepSize;
+        }
 
         _previousBit = currentBit;
     }
@@ -100,7 +108,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
         _encodedBits.Clear();
         CompressedData = [];
-        _reconstructed = 0;
+        _reconstructed = _context.Samples.First();
         _stepSize = _settings.InitialStepSize;
         _previousBit = null;
     }
@@ -116,8 +124,12 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
                 SampleCount =
                     _context!.Samples.Length,
 
-                InitialStepSize =
-                    _stepSize
+                InitialStepSize = _settings.InitialStepSize,
+                InitialPredictor = _context.Samples[0],
+                StepIncreaseFactor = _settings.StepIncreaseFactor,
+                StepDecreaseFactor = _settings.StepDecreaseFactor,
+                ConstFactor = _settings.constFactor,
+                
             };
 
         CompressedData = AdmFileWriter.Write(header, payload);
@@ -144,6 +156,4 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         // Console.WriteLine(
         //     $"Average Diff ≈ {(double)total / count:F2}");
     }
-
-    
 }
