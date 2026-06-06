@@ -3,53 +3,269 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AudioCompressionApp.ViewModels"
         xmlns:conv="clr-namespace:AudioCompressionApp.Converters"
+        xmlns:models="clr-namespace:AudioCompressionApp.Models"
         Style="{StaticResource Style.Window}"
         Title="AudioPress"
         Width="1280"
         Height="820">
 
-    <!-- ── Converters ──────────────────────────────────────── -->
     <Window.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
         <conv:NullToVisibilityConverter x:Key="NullToVisibility" />
         <conv:InverseBoolConverter x:Key="InverseBool" />
         <conv:ProgressToPercentConverter x:Key="ProgressToPercent" />
 
-        <!-- Formats the waveform icon path used in the drop zone -->
-        <Style x:Key="Style.DropIcon" TargetType="Path">
-            <Setter Property="Fill" Value="{StaticResource Brush.TextMuted}" />
-            <Setter Property="HorizontalAlignment" Value="Center" />
-            <Setter Property="Width" Value="48" />
-            <Setter Property="Height" Value="48" />
-            <Setter Property="Stretch" Value="Uniform" />
+        <!-- ── TreeView item styles ───────────────────────────────────────── -->
+
+        <!--
+            HierarchicalDataTemplate for DIRECTORY nodes.
+            Directories show a chevron icon + folder icon + name.
+            IsExpanded is two-way bound so lazy loading fires correctly.
+        -->
+        <HierarchicalDataTemplate DataType="{x:Type models:FileSystemNode}"
+                                  ItemsSource="{Binding Children}">
+            <StackPanel Orientation="Horizontal" Margin="0,2">
+
+                <!-- Folder icon (open / closed) -->
+                <Canvas Width="16" Height="16" VerticalAlignment="Center" Margin="0,0,6,0">
+                    <!-- Closed folder -->
+                    <Path
+                        Visibility="{Binding IsExpanded,
+                                       Converter={StaticResource BoolToVisibility},
+                                       ConverterParameter=Invert}"
+                        Data="M1,4 L6,4 L7.5,2 L15,2 L15,14 L1,14 Z"
+                        Fill="{StaticResource Brush.AccentDim}"
+                        Stretch="Uniform" Width="16" Height="16" />
+                    <!-- Open folder -->
+                    <Path
+                        Visibility="{Binding IsExpanded,
+                                       Converter={StaticResource BoolToVisibility}}"
+                        Data="M1,5 L6,5 L7.5,3 L15,3 L15,6 L16,6 L14,14 L0,14 L2,6 Z"
+                        Fill="{StaticResource Brush.Accent}"
+                        Stretch="Uniform" Width="16" Height="16" />
+                </Canvas>
+
+                <TextBlock Text="{Binding Name}"
+                           Foreground="{StaticResource Brush.TextPrimary}"
+                           FontSize="{StaticResource FontSize.Small}"
+                           VerticalAlignment="Center" />
+            </StackPanel>
+        </HierarchicalDataTemplate>
+
+        <!--
+            Style for TreeViewItem — handles expansion, selection highlight,
+            and dimming of unsupported file types.
+            IsExpanded and IsSelected are two-way bound to the node VM.
+        -->
+        <Style x:Key="Style.TreeViewItem" TargetType="TreeViewItem">
+            <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+            <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Padding" Value="4,3" />
+            <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TreeViewItem">
+                        <StackPanel>
+                            <!-- Row: indent + expander + content -->
+                            <Border x:Name="RowBorder"
+                                    Background="Transparent"
+                                    CornerRadius="{StaticResource Radius.Small}"
+                                    Padding="{TemplateBinding Padding}"
+                                    Margin="0,1">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition
+                                            Width="{Binding Level,
+                                                          RelativeSource={RelativeSource AncestorType=TreeViewItem},
+                                                          Converter={StaticResource NullToVisibility}}"
+                                            MinWidth="0" />
+                                        <ColumnDefinition Width="Auto" />  <!-- expander -->
+                                        <ColumnDefinition Width="*" />    <!-- content -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Expand / collapse toggle -->
+                                    <ToggleButton x:Name="Expander"
+                                                  Grid.Column="1"
+                                                  IsChecked="{Binding IsExpanded,
+                                                              RelativeSource={RelativeSource TemplatedParent},
+                                                              Mode=TwoWay}"
+                                                  Width="16" Height="16"
+                                                  Focusable="False"
+                                                  Visibility="{Binding HasItems,
+                                                               RelativeSource={RelativeSource TemplatedParent},
+                                                               Converter={StaticResource BoolToVisibility}}"
+                                                  Cursor="Hand">
+                                        <ToggleButton.Template>
+                                            <ControlTemplate TargetType="ToggleButton">
+                                                <Canvas Width="10" Height="10"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center">
+                                                    <!-- Collapsed: right-pointing chevron -->
+                                                    <Path x:Name="Arrow"
+                                                          Data="M2,1 L8,5 L2,9"
+                                                          Stroke="{StaticResource Brush.TextMuted}"
+                                                          StrokeThickness="1.5"
+                                                          StrokeLineJoin="Round"
+                                                          StrokeEndLineCap="Round"
+                                                          StrokeStartLineCap="Round" />
+                                                </Canvas>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsChecked" Value="True">
+                                                        <!-- Expanded: down-pointing chevron -->
+                                                        <Setter TargetName="Arrow" Property="Data"
+                                                                Value="M1,3 L5,8 L9,3" />
+                                                        <Setter TargetName="Arrow" Property="Stroke"
+                                                                Value="{StaticResource Brush.Accent}" />
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </ToggleButton.Template>
+                                    </ToggleButton>
+
+                                    <!-- Node content (the HierarchicalDataTemplate / file template) -->
+                                    <ContentPresenter x:Name="Content"
+                                                      Grid.Column="2"
+                                                      Margin="4,0,0,0"
+                                                      ContentSource="Header"
+                                                      VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Children panel -->
+                            <ItemsPresenter x:Name="ItemsHost"
+                                            Margin="12,0,0,0"
+                                            Visibility="Collapsed" />
+                        </StackPanel>
+
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsExpanded" Value="True">
+                                <Setter TargetName="ItemsHost" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background"
+                                        Value="{StaticResource Brush.AccentMuted}" />
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="False" />
+                                    <Condition Property="IsMouseOver" Value="True" />
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="RowBorder" Property="Background"
+                                        Value="{StaticResource Brush.SurfaceHighlight}" />
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+
+            <!-- Dim unsupported files -->
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsUnsupported}" Value="True">
+                    <Setter Property="Opacity" Value="0.35" />
+                    <Setter Property="IsHitTestVisible" Value="False" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
+
+        <!--
+            DataTemplate for FILE nodes.
+            Files show a small file-type icon + name.
+            Audio files use the accent colour; compressed files use amber.
+        -->
+        <DataTemplate x:Key="Template.FileNode" DataType="{x:Type models:FileSystemNode}">
+            <StackPanel Orientation="Horizontal" Margin="0,2">
+
+                <!-- Audio file icon (waveform bars) -->
+                <Canvas Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,6,0"
+                        Visibility="{Binding IsAudioFile, Converter={StaticResource BoolToVisibility}}">
+                    <Rectangle Canvas.Left="0" Canvas.Top="5" Width="2" Height="4"
+                               Fill="{StaticResource Brush.AccentDim}" RadiusX="1" RadiusY="1" />
+                    <Rectangle Canvas.Left="3" Canvas.Top="2" Width="2" Height="10"
+                               Fill="{StaticResource Brush.Accent}" RadiusX="1" RadiusY="1" />
+                    <Rectangle Canvas.Left="6" Canvas.Top="0" Width="2" Height="14"
+                               Fill="{StaticResource Brush.Accent}" RadiusX="1" RadiusY="1" />
+                    <Rectangle Canvas.Left="9" Canvas.Top="3" Width="2" Height="8"
+                               Fill="{StaticResource Brush.AccentDim}" RadiusX="1" RadiusY="1" />
+                    <Rectangle Canvas.Left="12" Canvas.Top="6" Width="2" Height="2"
+                               Fill="{StaticResource Brush.AccentDim}" RadiusX="1" RadiusY="1" />
+                </Canvas>
+
+                <!-- Compressed file icon (lightning bolt / archive) -->
+                <Canvas Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,6,0"
+                        Visibility="{Binding IsCompressedFile, Converter={StaticResource BoolToVisibility}}">
+                    <Path Data="M8,0 L4,7 L7,7 L6,14 L10,6 L7,6 Z"
+                          Fill="{StaticResource Brush.Amber}"
+                          Stretch="Fill" Width="14" Height="14" />
+                </Canvas>
+
+                <!-- Generic/unsupported file icon -->
+                <Canvas Width="14" Height="14" VerticalAlignment="Center" Margin="0,0,6,0"
+                        Visibility="{Binding IsUnsupported, Converter={StaticResource BoolToVisibility}}">
+                    <Rectangle Width="10" Height="13" Canvas.Left="2"
+                               Stroke="{StaticResource Brush.TextMuted}"
+                               StrokeThickness="1" Fill="Transparent"
+                               RadiusX="1" RadiusY="1" />
+                </Canvas>
+
+                <TextBlock Text="{Binding Name}"
+                           FontSize="{StaticResource FontSize.Small}"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                            <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsAudioFile}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsCompressedFile}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource Brush.Amber}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </DataTemplate>
+
+        <!--
+            DataTemplateSelector is not needed because we use a single
+            HierarchicalDataTemplate for directories and override the
+            header template for file nodes inside the TreeView's
+            ItemContainerStyle. The file DataTemplate above is applied
+            via a trigger that checks IsDirectory.
+        -->
+
     </Window.Resources>
 
     <!-- =========================================================
          ROOT GRID
-         Col 0: left sidebar (navigation + logo)
-         Col 1: main content area
+         Col 0: left explorer panel (tree + folder controls)
+         Col 1: GridSplitter  (resizable divider)
+         Col 2: main content area
     ========================================================== -->
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220" />
+            <ColumnDefinition Width="260" MinWidth="180" MaxWidth="420" />
+            <ColumnDefinition Width="5" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <!-- =====================================================
-             LEFT SIDEBAR
+             COL 0 — FILE EXPLORER PANEL
+             DataContext: FileSystemTree (FileSystemTreeViewModel)
         ====================================================== -->
         <Border Grid.Column="0"
+                DataContext="{Binding FileSystemTree}"
                 Background="{StaticResource Brush.Surface}"
                 BorderBrush="{StaticResource Brush.Border}"
                 BorderThickness="0,0,1,0">
             <DockPanel>
 
-                <!-- Logo / App name -->
-                <Border DockPanel.Dock="Top" Padding="24,28,24,24">
+                <!-- ── App logo / name ──────────────────────── -->
+                <Border DockPanel.Dock="Top" Padding="16,20,16,16">
                     <StackPanel>
-                        <!-- Waveform icon (pure XAML geometry) -->
-                        <Canvas Width="32" Height="20" HorizontalAlignment="Left" Margin="0,0,0,12">
+                        <Canvas Width="32" Height="20" HorizontalAlignment="Left" Margin="0,0,0,10">
                             <Rectangle Canvas.Left="0" Canvas.Top="8" Width="4" Height="4"
                                        Fill="{StaticResource Brush.Accent}" RadiusX="2" RadiusY="2" />
                             <Rectangle Canvas.Left="6" Canvas.Top="4" Width="4" Height="12"
@@ -64,193 +280,194 @@
                                        Fill="{StaticResource Brush.Accent}" RadiusX="2" RadiusY="2" />
                         </Canvas>
                         <TextBlock Text="AudioPress"
-                                   FontSize="{StaticResource FontSize.XLarge}"
+                                   FontSize="{StaticResource FontSize.Large}"
                                    FontWeight="Bold"
                                    Foreground="{StaticResource Brush.TextPrimary}" />
                         <TextBlock Text="Audio Compression Workstation"
                                    Style="{StaticResource Style.Placeholder}"
-                                   Margin="0,3,0,0"
+                                   Margin="0,2,0,0"
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
-                <Separator DockPanel.Dock="Top" Margin="16,0" />
+                <Separator DockPanel.Dock="Top" Margin="12,0" />
 
-                <!-- Mode Selector -->
-                <StackPanel DockPanel.Dock="Top" Margin="16,20,16,0">
-                    <TextBlock Text="MODE"
-                               Style="{StaticResource Style.Label}"
-                               Margin="8,0,0,10" />
+                <!-- ── Folder toolbar ───────────────────────── -->
+                <Grid DockPanel.Dock="Top" Margin="12,12,12,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-                    <!-- Compress Tab -->
-                    <Border x:Name="CompressModeBtn"
-                            CornerRadius="{StaticResource Radius.Medium}"
-                            Padding="14,11"
-                            Cursor="Hand"
-                            Margin="0,0,0,4">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsCompressMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource Brush.AccentMuted}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <Border.InputBindings>
-                            <MouseBinding MouseAction="LeftClick"
-                                          Command="{Binding SetCompressModeCommand}" />
-                        </Border.InputBindings>
+                    <!-- Current folder name -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="EXPLORER"
+                                   Style="{StaticResource Style.Label}"
+                                   Margin="4,0,0,2" />
+                        <TextBlock Text="{Binding RootFolderName}"
+                                   FontSize="{StaticResource FontSize.Small}"
+                                   Foreground="{StaticResource Brush.TextSecondary}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Margin="4,0,4,0"
+                                   ToolTip="{Binding RootFolderPath}" />
+                    </StackPanel>
+
+                    <!-- Open folder button -->
+                    <Button Grid.Column="1"
+                            Style="{StaticResource Style.Button.Secondary}"
+                            Command="{Binding OpenFolderCommand}"
+                            Padding="10,6"
+                            ToolTip="Open a folder to browse">
                         <StackPanel Orientation="Horizontal">
-                            <!-- Compress icon (↓ arrow with lines) -->
-                            <Canvas Width="18" Height="18" VerticalAlignment="Center">
-                                <Line X1="9" Y1="2" X2="9" Y2="12"
-                                      StrokeThickness="1.8" StrokeEndLineCap="Round">
-                                    <Line.Stroke>
-                                        <SolidColorBrush>
-                                            <SolidColorBrush.Color>
-                                                <Binding Path="IsCompressMode">
-                                                    <Binding.Converter>
-                                                        <conv:BoolToVisibilityConverter />
-                                                    </Binding.Converter>
-                                                </Binding>
-                                            </SolidColorBrush.Color>
-                                        </SolidColorBrush>
-                                    </Line.Stroke>
-                                </Line>
-                                <Polyline Points="5,8 9,13 13,8"
-                                          StrokeThickness="1.8" StrokeLineJoin="Round"
-                                          StrokeEndLineCap="Round" StrokeStartLineCap="Round"
-                                          Stroke="{StaticResource Brush.Accent}" />
-                                <Line X1="3" Y1="16" X2="15" Y2="16"
-                                      StrokeThickness="1.8" StrokeEndLineCap="Round"
-                                      Stroke="{StaticResource Brush.Accent}" />
+                            <!-- Folder icon -->
+                            <Canvas Width="14" Height="12" VerticalAlignment="Center">
+                                <Path Data="M0,3 L5,3 L6.5,1.5 L14,1.5 L14,11 L0,11 Z"
+                                      Fill="{StaticResource Brush.AccentDim}"
+                                      Stretch="Fill" Width="14" Height="12" />
                             </Canvas>
-                            <StackPanel Margin="12,0,0,0">
-                                <TextBlock Text="Compress">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                            <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
-                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsCompressMode}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="Audio → Compressed"
-                                           Style="{StaticResource Style.Placeholder}"
-                                           Margin="0,2,0,0" />
-                            </StackPanel>
+                            <TextBlock Text=" Open"
+                                       FontSize="{StaticResource FontSize.Small}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- ── Legend chips ──────────────────────────── -->
+                <StackPanel DockPanel.Dock="Top"
+                            Orientation="Horizontal"
+                            Margin="16,0,16,10">
+                    <!-- Audio legend -->
+                    <Border Style="{StaticResource Style.InfoChip}"
+                            Padding="6,4" Margin="0,0,6,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Rectangle Width="6" Height="6"
+                                       Fill="{StaticResource Brush.Accent}"
+                                       RadiusX="3" RadiusY="3"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,0" />
+                            <TextBlock Text="Audio"
+                                       Style="{StaticResource Style.Placeholder}"
+                                       FontSize="{StaticResource FontSize.XSmall}" />
                         </StackPanel>
                     </Border>
-
-                    <!-- Decompress Tab -->
-                    <Border x:Name="DecompressModeBtn"
-                            CornerRadius="{StaticResource Radius.Medium}"
-                            Padding="14,11"
-                            Cursor="Hand">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                        <Setter Property="Background" Value="{StaticResource Brush.AccentMuted}" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <Border.InputBindings>
-                            <MouseBinding MouseAction="LeftClick"
-                                          Command="{Binding SetDecompressModeCommand}" />
-                        </Border.InputBindings>
+                    <!-- Compressed legend -->
+                    <Border Style="{StaticResource Style.InfoChip}" Padding="6,4">
                         <StackPanel Orientation="Horizontal">
-                            <Canvas Width="18" Height="18" VerticalAlignment="Center">
-                                <Polyline Points="5,5 9,2 13,5"
-                                          StrokeThickness="1.8" StrokeLineJoin="Round"
-                                          StrokeEndLineCap="Round" StrokeStartLineCap="Round"
-                                          Stroke="{StaticResource Brush.TextMuted}" />
-                                <Line X1="9" Y1="2" X2="9" Y2="12"
-                                      StrokeThickness="1.8" StrokeEndLineCap="Round"
-                                      Stroke="{StaticResource Brush.TextMuted}" />
-                                <Line X1="3" Y1="16" X2="15" Y2="16"
-                                      StrokeThickness="1.8" StrokeEndLineCap="Round"
-                                      Stroke="{StaticResource Brush.TextMuted}" />
-                            </Canvas>
-                            <StackPanel Margin="12,0,0,0">
-                                <TextBlock Text="Decompress">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                            <Setter Property="Foreground" Value="{StaticResource Brush.TextSecondary}" />
-                                            <Setter Property="FontWeight" Value="SemiBold" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                                    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                                <TextBlock Text="Compressed → Audio"
-                                           Style="{StaticResource Style.Placeholder}"
-                                           Margin="0,2,0,0" />
-                            </StackPanel>
+                            <Rectangle Width="6" Height="6"
+                                       Fill="{StaticResource Brush.Amber}"
+                                       RadiusX="3" RadiusY="3"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,0" />
+                            <TextBlock Text="Compressed"
+                                       Style="{StaticResource Style.Placeholder}"
+                                       FontSize="{StaticResource FontSize.XSmall}" />
                         </StackPanel>
                     </Border>
                 </StackPanel>
 
-                <Separator DockPanel.Dock="Top" Margin="16,20" />
+                <!-- ── "No folder open" empty state ─────────── -->
+                <Border DockPanel.Dock="Top"
+                        Margin="16,0"
+                        Padding="16,24"
+                        Style="{StaticResource Style.Card}"
+                        Visibility="{Binding HasRootFolder,
+                                     Converter={StaticResource BoolToVisibility},
+                                     ConverterParameter=Invert}">
+                    <StackPanel HorizontalAlignment="Center">
+                        <!-- Folder icon (large) -->
+                        <Canvas Width="36" Height="30"
+                                HorizontalAlignment="Center"
+                                Margin="0,0,0,12">
+                            <Path Data="M0,6 L12,6 L15,3 L36,3 L36,27 L0,27 Z"
+                                  Fill="{StaticResource Brush.TextMuted}"
+                                  Stretch="Fill" Width="36" Height="26"
+                                  Canvas.Top="2" />
+                        </Canvas>
+                        <TextBlock Text="No folder opened"
+                                   Foreground="{StaticResource Brush.TextSecondary}"
+                                   FontSize="{StaticResource FontSize.Small}"
+                                   FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock Text="Click Open to browse files"
+                                   Style="{StaticResource Style.Placeholder}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,4,0,12"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                        <Button Content="Open Folder"
+                                Style="{StaticResource Style.Button.Secondary}"
+                                Command="{Binding OpenFolderCommand}"
+                                HorizontalAlignment="Center"
+                                Padding="14,7" />
+                    </StackPanel>
+                </Border>
 
-                <!-- Activity Log -->
-                <StackPanel DockPanel.Dock="Top" Margin="16,0,16,0" Height="180">
-                    <TextBlock Text="ACTIVITY LOG"
-                               Style="{StaticResource Style.Label}"
-                               Margin="8,0,0,10" />
-                    <Border Style="{StaticResource Style.Card}"
-                            Padding="12"
-                            Height="150"
-                            BorderBrush="{StaticResource Brush.BorderSubtle}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{Binding Logs}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}"
-                                                   Style="{StaticResource Style.LogEntry}"
-                                                   TextWrapping="Wrap" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                    </Border>
-                </StackPanel>
+                <!-- ── Tree View ──────────────────────────────── -->
+                <TreeView x:Name="FileTree"
+                          DockPanel.Dock="Top"
+                          ItemsSource="{Binding RootNodes}"
+                          ItemContainerStyle="{StaticResource Style.TreeViewItem}"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Margin="8,0,8,0"
+                          VirtualizingPanel.IsVirtualizing="True"
+                          VirtualizingPanel.VirtualizationMode="Recycling"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                          Visibility="{Binding HasRootFolder,
+                                       Converter={StaticResource BoolToVisibility}}"
+                          SelectedItemChanged="FileTree_OnSelectedItemChanged"
+                          AllowDrop="True"
+                          Drop="FileTree_OnDrop"
+                          DragEnter="FileTree_OnDragEnter">
+                    <!--
+                        ItemTemplate is NOT set here because the HierarchicalDataTemplate
+                        in Window.Resources already applies by DataType to directories.
+                        File nodes override the header via the ItemContainerStyle trigger below.
 
-                <!-- Version stamp pinned to bottom -->
+                        WPF TreeView applies HierarchicalDataTemplate to ALL nodes.
+                        Since files have no children, WPF just renders the header part.
+                        We use a DataTrigger inside the TreeViewItem style to swap
+                        the header template for file nodes.
+                    -->
+                </TreeView>
+
+                <!-- Version stamp -->
                 <TextBlock DockPanel.Dock="Bottom"
                            Text="v1.0.0"
                            Style="{StaticResource Style.Placeholder}"
                            HorizontalAlignment="Center"
-                           Margin="0,0,0,16" />
+                           Margin="0,0,0,14" />
 
             </DockPanel>
         </Border>
 
         <!-- =====================================================
-             MAIN CONTENT AREA
+             COL 1 — GRID SPLITTER
         ====================================================== -->
-        <Grid Grid.Column="1" Margin="28">
+        <GridSplitter Grid.Column="1"
+                      Width="5"
+                      HorizontalAlignment="Stretch"
+                      Background="{StaticResource Brush.Border}"
+                      Cursor="SizeWE"
+                      ShowsPreview="False" />
+
+        <!-- =====================================================
+             COL 2 — MAIN CONTENT AREA
+             (identical to original except the drop zone is removed
+             and the header now reflects extension-detected mode)
+        ====================================================== -->
+        <Grid Grid.Column="2" Margin="28">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />  <!-- Header bar -->
-                <RowDefinition Height="24" />    <!-- gap -->
-                <RowDefinition Height="*" />     <!-- Content -->
-                <RowDefinition Height="16" />    <!-- gap -->
-                <RowDefinition Height="Auto" />  <!-- Bottom strip (progress + results) -->
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="24" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="16" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
             <!-- ─────────────────────────────────────────────
                  ROW 0 — PAGE HEADER
+                 Includes a read-only mode badge driven by IsCompressMode.
             ────────────────────────────────────────────── -->
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
@@ -259,28 +476,72 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0">
-                    <TextBlock
-                        FontSize="{StaticResource FontSize.XLarge}">
-                        <TextBlock.Style>
-                            <Style TargetType="TextBlock" BasedOn="{StaticResource Style.SectionHeading}">
-                                <Setter Property="Text" Value="Compress Audio" />
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                        <Setter Property="Text" Value="Decompress Audio" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </TextBlock.Style>
-                    </TextBlock>
+                    <!-- Title -->
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontSize="{StaticResource FontSize.XLarge}"
+                                   FontWeight="SemiBold">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Style.SectionHeading}">
+                                    <Setter Property="Text" Value="Compress Audio" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                            <Setter Property="Text" Value="Decompress Audio" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <!-- ── READ-ONLY MODE BADGE ─────────────────────────
+                             Shows "COMPRESS" or "DECOMPRESS" in a coloured pill.
+                             No click binding — purely informational.
+                        ─────────────────────────────────────────────────── -->
+                        <Border Margin="12,0,0,0"
+                                Padding="10,4"
+                                VerticalAlignment="Center"
+                                CornerRadius="{StaticResource Radius.Pill}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <!-- Default: compress (cyan) -->
+                                    <Setter Property="Background" Value="{StaticResource Brush.AccentMuted}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource Brush.AccentDim}" />
+                                    <Setter Property="BorderThickness" Value="1" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                            <Setter Property="Background" Value="{StaticResource Brush.AmberMuted}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource Brush.AmberDim}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <TextBlock FontSize="{StaticResource FontSize.XSmall}"
+                                       FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                        <Setter Property="Text" Value="COMPRESS MODE" />
+                                        <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                <Setter Property="Text" Value="DECOMPRESS MODE" />
+                                                <Setter Property="Foreground" Value="{StaticResource Brush.Amber}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Subtitle -->
                     <TextBlock Margin="0,4,0,0">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Placeholder}">
                                 <Setter Property="Text"
-                                        Value="Load an audio file and choose an algorithm to compress it." />
+                                        Value="Select a .wav or .mp3 file in the explorer to compress it." />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
                                         <Setter Property="Text"
-                                                Value="Load a compressed file to decompress and play it back." />
+                                                Value="Select a compressed file in the explorer to decompress it." />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -288,7 +549,7 @@
                     </TextBlock>
                 </StackPanel>
 
-                <!-- Reset button (top-right) -->
+                <!-- Reset button -->
                 <Button Grid.Column="1"
                         Content="↺  Reset"
                         Style="{StaticResource Style.Button.Danger}"
@@ -298,13 +559,13 @@
 
             <!-- ─────────────────────────────────────────────
                  ROW 2 — MAIN CONTENT (3-column layout)
-                 Col 0: file drop + file info (flex)
-                 Col 1: algorithm + settings (fixed)
-                 Col 2: playback + compressed info (fixed)
+                 Col 0: file info panel  (flex)
+                 Col 2: algorithm + settings (fixed 300)
+                 Col 4: playback + actions (fixed 260)
             ────────────────────────────────────────────── -->
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" MinWidth="260" />
+                    <ColumnDefinition Width="*" MinWidth="220" />
                     <ColumnDefinition Width="20" />
                     <ColumnDefinition Width="300" />
                     <ColumnDefinition Width="20" />
@@ -312,129 +573,70 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- ══════════════════════════════════════════
-                     COLUMN 0 — FILE PANEL
-                     (Drop zone + source file info)
+                     COLUMN 0 — FILE INFO PANEL
+                     (No more drop zone — selection comes from the tree)
                 ═══════════════════════════════════════════ -->
                 <DockPanel Grid.Column="0">
 
-                    <!-- ── Drop Zone ───────────────────────── -->
-                    <Border DockPanel.Dock="Top"
-                            Style="{StaticResource Style.DropZone}"
-                            Height="210"
-                            AllowDrop="True"
-                            DragEnter="FileDropBorder_OnDragEnter"
-                            Drop="FileDropBorder_OnDrop">
-                        <!-- Dashed border effect using a rectangle with StrokeDashArray -->
-                        <Border CornerRadius="{StaticResource Radius.Large}"
-                                BorderThickness="1.5"
-                                Margin="-1">
-                            <Border.BorderBrush>
-                                <DrawingBrush Viewport="0,0,12,12" ViewportUnits="Absolute" TileMode="Tile">
-                                    <DrawingBrush.Drawing>
-                                        <GeometryDrawing>
-                                            <GeometryDrawing.Geometry>
-                                                <RectangleGeometry Rect="0,0,12,12" />
-                                            </GeometryDrawing.Geometry>
-                                            <GeometryDrawing.Pen>
-                                                <Pen Brush="{StaticResource Brush.Border}"
-                                                     Thickness="1.5"
-                                                     DashStyle="{x:Static DashStyles.Dash}" />
-                                            </GeometryDrawing.Pen>
-                                        </GeometryDrawing>
-                                    </DrawingBrush.Drawing>
-                                </DrawingBrush>
-                            </Border.BorderBrush>
-                            <StackPanel VerticalAlignment="Center"
-                                        HorizontalAlignment="Center">
-
-                                <!-- Waveform / file icon -->
-                                <Canvas Width="52" Height="36"
-                                        HorizontalAlignment="Center"
-                                        Margin="0,0,0,16">
-                                    <Rectangle Canvas.Left="0" Canvas.Top="16" Width="6" Height="4"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="8" Canvas.Top="10" Width="6" Height="16"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="16" Canvas.Top="0" Width="6" Height="36"
-                                               Fill="{StaticResource Brush.AccentDim}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="24" Canvas.Top="8" Width="6" Height="20"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="32" Canvas.Top="14" Width="6" Height="8"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="40" Canvas.Top="11" Width="6" Height="14"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
-                                    <Rectangle Canvas.Left="48" Canvas.Top="17" Width="4" Height="2"
-                                               Fill="{StaticResource Brush.TextMuted}" RadiusX="2" RadiusY="2" />
-                                </Canvas>
-
-                                <!-- Compress mode drop text -->
-                                <StackPanel
-                                    Visibility="{Binding IsCompressMode,
-                                                Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Drop audio file here"
-                                               FontSize="{StaticResource FontSize.Medium}"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource Brush.TextSecondary}"
-                                               HorizontalAlignment="Center" />
-                                    <TextBlock Text=".wav · .mp3"
-                                               Style="{StaticResource Style.Placeholder}"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,4,0,0" />
-                                </StackPanel>
-
-                                <!-- Decompress mode drop text -->
-                                <StackPanel
-                                    Visibility="{Binding IsDecompressMode,
-                                                Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="Drop compressed file here"
-                                               FontSize="{StaticResource FontSize.Medium}"
-                                               FontWeight="SemiBold"
-                                               Foreground="{StaticResource Brush.TextSecondary}"
-                                               HorizontalAlignment="Center" />
-                                    <TextBlock Text=".dpcm · .adm · .dm · .nlq · .pdc"
-                                               Style="{StaticResource Style.Placeholder}"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,4,0,0" />
-                                </StackPanel>
-
-                                <!-- Browse button -->
-                                <Button Margin="0,14,0,0"
-                                        HorizontalAlignment="Center">
-                                    <Button.Style>
-                                        <Style TargetType="Button" BasedOn="{StaticResource Style.Button.Secondary}">
-                                            <Setter Property="Content" Value="Browse Audio File" />
-                                            <Setter Property="Command" Value="{Binding OpenAudioCommand}" />
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                                    <Setter Property="Content" Value="Browse Compressed File" />
-                                                    <Setter Property="Command" Value="{Binding OpenCompressedCommand}" />
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Button.Style>
-                                </Button>
-                            </StackPanel>
-                        </Border>
-                    </Border>
-
-                    <!-- ── Source File Info Card ──────────── -->
+                    <!-- ── "Select a file" empty state ───────── -->
                     <Border DockPanel.Dock="Top"
                             Style="{StaticResource Style.Card}"
-                            Margin="0,16,0,0"
-                            Visibility="{Binding IsCompressMode,
+                            Padding="24,32"
+                            Visibility="{Binding IsAudioLoaded,
+                                         Converter={StaticResource BoolToVisibility},
+                                         ConverterParameter=Invert}">
+                        <StackPanel HorizontalAlignment="Center"
+                                    Visibility="{Binding IsCompressedFileLoaded,
+                                                 Converter={StaticResource BoolToVisibility},
+                                                 ConverterParameter=Invert}">
+                            <!-- Waveform bars icon -->
+                            <Canvas Width="52" Height="36"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,16">
+                                <Rectangle Canvas.Left="0" Canvas.Top="16" Width="6" Height="4"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="8" Canvas.Top="10" Width="6" Height="16"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="16" Canvas.Top="0" Width="6" Height="36"
+                                           Fill="{StaticResource Brush.AccentDim}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="24" Canvas.Top="8" Width="6" Height="20"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="32" Canvas.Top="14" Width="6" Height="8"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="40" Canvas.Top="11" Width="6" Height="14"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="3" RadiusY="3" />
+                                <Rectangle Canvas.Left="48" Canvas.Top="17" Width="4" Height="2"
+                                           Fill="{StaticResource Brush.TextMuted}" RadiusX="2" RadiusY="2" />
+                            </Canvas>
+                            <TextBlock Text="No file selected"
+                                       FontSize="{StaticResource FontSize.Medium}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource Brush.TextSecondary}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="Pick a file from the explorer panel on the left."
+                                       Style="{StaticResource Style.Placeholder}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- ── Source File Info Card (compress mode) ── -->
+                    <Border DockPanel.Dock="Top"
+                            Style="{StaticResource Style.Card}"
+                            Visibility="{Binding IsAudioLoaded,
                                          Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="SOURCE FILE"
                                        Style="{StaticResource Style.Label}"
                                        Margin="0,0,0,14" />
 
-                            <!-- File name row -->
                             <Grid Margin="0,0,0,16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <!-- File icon -->
                                 <Border Grid.Column="0"
                                         Width="36" Height="36"
                                         Background="{StaticResource Brush.SurfaceHighlight}"
@@ -456,9 +658,7 @@
                                 </StackPanel>
                             </Grid>
 
-                            <!-- Metadata chips -->
                             <UniformGrid Columns="3" HorizontalAlignment="Stretch">
-                                <!-- Sample Rate -->
                                 <Border Style="{StaticResource Style.InfoChip}" Margin="0,0,6,0">
                                     <StackPanel>
                                         <TextBlock Text="SAMPLE RATE"
@@ -469,7 +669,6 @@
                                                    FontSize="{StaticResource FontSize.Body}" />
                                     </StackPanel>
                                 </Border>
-                                <!-- Channels -->
                                 <Border Style="{StaticResource Style.InfoChip}" Margin="3,0">
                                     <StackPanel>
                                         <TextBlock Text="CHANNELS"
@@ -480,7 +679,6 @@
                                                    FontSize="{StaticResource FontSize.Body}" />
                                     </StackPanel>
                                 </Border>
-                                <!-- Bit Depth -->
                                 <Border Style="{StaticResource Style.InfoChip}" Margin="6,0,0,0">
                                     <StackPanel>
                                         <TextBlock Text="BIT DEPTH"
@@ -495,11 +693,11 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- ── Compressed File Info Card (decompress mode) ─── -->
+                    <!-- ── Compressed File Info Card (decompress mode) ── -->
                     <Border DockPanel.Dock="Top"
                             Style="{StaticResource Style.Card}"
                             Margin="0,16,0,0"
-                            Visibility="{Binding IsDecompressMode,
+                            Visibility="{Binding IsCompressedFileLoaded,
                                          Converter={StaticResource BoolToVisibility}}">
                         <StackPanel>
                             <TextBlock Text="COMPRESSED FILE"
@@ -557,7 +755,31 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Spacer -->
+                    <!-- Activity Log (moved here from sidebar) -->
+                    <Border DockPanel.Dock="Bottom"
+                            Style="{StaticResource Style.Card}"
+                            Padding="14"
+                            Margin="0,16,0,0"
+                            MaxHeight="160">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top"
+                                       Text="ACTIVITY LOG"
+                                       Style="{StaticResource Style.Label}"
+                                       Margin="0,0,0,10" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <ItemsControl ItemsSource="{Binding Logs}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}"
+                                                       Style="{StaticResource Style.LogEntry}"
+                                                       TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </DockPanel>
+                    </Border>
+
                     <Border DockPanel.Dock="Top" Height="0" />
                 </DockPanel>
 
@@ -569,7 +791,6 @@
                            Visibility="{Binding IsCompressMode,
                                         Converter={StaticResource BoolToVisibility}}">
 
-                    <!-- Algorithm Selector Card -->
                     <Border DockPanel.Dock="Top" Style="{StaticResource Style.Card}">
                         <StackPanel>
                             <TextBlock Text="ALGORITHM"
@@ -587,7 +808,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Algorithm Settings Card -->
                     <Border DockPanel.Dock="Top"
                             Style="{StaticResource Style.Card}"
                             Margin="0,16,0,0"
@@ -597,17 +817,9 @@
                             <TextBlock Text="SETTINGS"
                                        Style="{StaticResource Style.Label}"
                                        Margin="0,0,0,16" />
-
-                            <!-- Dynamic settings panel -->
-                            <!-- Each algorithm's settings VM exposes its own properties.
-                                 Replace this placeholder with a DataTemplate selector
-                                 or typed ContentPresenter per algorithm. -->
                             <ContentPresenter Content="{Binding AlgorithmSettingsViewModel}">
                                 <ContentPresenter.ContentTemplate>
                                     <DataTemplate DataType="{x:Type vm:AlgorithmSettingsViewModel}">
-                                        <!-- PLACEHOLDER settings panel.
-                                             Replace with DataTemplateSelector or
-                                             algorithm-specific UserControls. -->
                                         <StackPanel>
                                             <TextBlock Text="PARAMETER 1"
                                                        Style="{StaticResource Style.Label}"
@@ -629,7 +841,6 @@
                                                            HorizontalAlignment="Right"
                                                            VerticalAlignment="Center" />
                                             </Grid>
-
                                             <TextBlock Text="PARAMETER 2"
                                                        Style="{StaticResource Style.Label}"
                                                        Margin="0,16,0,6" />
@@ -657,7 +868,6 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Spacer -->
                     <Border DockPanel.Dock="Top" Height="0" />
                 </DockPanel>
 
@@ -669,15 +879,12 @@
                     <!-- Playback Card -->
                     <Border DockPanel.Dock="Top" Style="{StaticResource Style.Card}">
                         <StackPanel>
-                            <TextBlock
-                                Margin="0,0,0,16">
+                            <TextBlock Margin="0,0,0,16">
                                 <TextBlock.Style>
-                                    <Style TargetType="TextBlock"
-                                           BasedOn="{StaticResource Style.Label}">
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
                                         <Setter Property="Text" Value="PLAYBACK" />
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsDecompressMode}"
-                                                         Value="True">
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
                                                 <Setter Property="Text" Value="DECOMPRESSED PLAYBACK" />
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -685,14 +892,13 @@
                                 </TextBlock.Style>
                             </TextBlock>
 
-                            <!-- Visualizer placeholder (waveform bars) -->
+                            <!-- Decorative waveform -->
                             <Border Height="56"
                                     Background="{StaticResource Brush.SurfaceHighlight}"
                                     CornerRadius="{StaticResource Radius.Medium}"
                                     Margin="0,0,0,16"
                                     ClipToBounds="True">
                                 <Canvas>
-                                    <!-- Static decorative waveform bars -->
                                     <Rectangle Canvas.Left="4" Canvas.Top="22" Width="5" Height="12"
                                                Fill="{StaticResource Brush.Border}" RadiusX="2" RadiusY="2" />
                                     <Rectangle Canvas.Left="11" Canvas.Top="14" Width="5" Height="28"
@@ -765,10 +971,6 @@
                                                Fill="{StaticResource Brush.Border}" RadiusX="2" RadiusY="2" />
                                     <Rectangle Canvas.Left="249" Canvas.Top="14" Width="5" Height="28"
                                                Fill="{StaticResource Brush.Border}" RadiusX="2" RadiusY="2" />
-                                    <TextBlock Text="Waveform"
-                                               Style="{StaticResource Style.Placeholder}"
-                                               Canvas.Left="0" Canvas.Top="0"
-                                               Opacity="0" />
                                 </Canvas>
                             </Border>
 
@@ -777,7 +979,6 @@
                                         HorizontalAlignment="Center"
                                         Visibility="{Binding IsCompressMode,
                                                      Converter={StaticResource BoolToVisibility}}">
-                                <!-- Stop -->
                                 <Button Style="{StaticResource Style.Button.Icon}"
                                         Command="{Binding StopCommand}"
                                         ToolTip="Stop">
@@ -787,10 +988,7 @@
                                                    RadiusX="2" RadiusY="2" />
                                     </Canvas>
                                 </Button>
-                                <!-- Play / Pause toggle -->
-                                <Button
-                                    Margin="12,0"
-                                    ToolTip="Play / Pause">
+                                <Button Margin="12,0" ToolTip="Play / Pause">
                                     <Button.Style>
                                         <Style TargetType="Button"
                                                BasedOn="{StaticResource Style.Button.Play}">
@@ -802,16 +1000,13 @@
                                             </Style.Triggers>
                                         </Style>
                                     </Button.Style>
-                                    <!-- Play triangle -->
                                     <Canvas Width="16" Height="16">
-                                        <!-- Play icon -->
                                         <Polygon
                                             Visibility="{Binding IsPlayingSource,
                                                               Converter={StaticResource BoolToVisibility},
                                                               ConverterParameter=Invert}"
                                             Points="2,1 14,8 2,15"
                                             Fill="{StaticResource Brush.Accent}" />
-                                        <!-- Pause icon -->
                                         <StackPanel Orientation="Horizontal"
                                                     Visibility="{Binding IsPlayingSource,
                                                                  Converter={StaticResource BoolToVisibility}}">
@@ -824,10 +1019,8 @@
                                         </StackPanel>
                                     </Canvas>
                                 </Button>
-                                <!-- Skip-to-end placeholder -->
                                 <Button Style="{StaticResource Style.Button.Icon}"
-                                        IsEnabled="False"
-                                        ToolTip="Skip">
+                                        IsEnabled="False" ToolTip="Skip">
                                     <Canvas Width="14" Height="14">
                                         <Polygon Points="0,0 10,7 0,14"
                                                  Fill="{StaticResource Brush.TextMuted}" />
@@ -870,7 +1063,6 @@
                             Style="{StaticResource Style.Card}"
                             Margin="0,16,0,0">
                         <StackPanel>
-
                             <!-- COMPRESS ACTION -->
                             <StackPanel
                                 Visibility="{Binding IsCompressMode,
@@ -888,7 +1080,6 @@
                                         Visibility="{Binding IsCompressing,
                                                      Converter={StaticResource BoolToVisibility}}" />
                             </StackPanel>
-
                             <!-- DECOMPRESS ACTION -->
                             <StackPanel
                                 Visibility="{Binding IsDecompressMode,
@@ -909,14 +1100,13 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Spacer -->
                     <Border DockPanel.Dock="Top" Height="0" />
                 </DockPanel>
-
             </Grid>
 
             <!-- ─────────────────────────────────────────────
                  ROW 4 — PROGRESS + RESULTS STRIP
+                 (unchanged from original)
             ────────────────────────────────────────────── -->
             <Border Grid.Row="4"
                     Style="{StaticResource Style.Card}"
@@ -928,7 +1118,6 @@
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
-                    <!-- Left: Progress section -->
                     <StackPanel Grid.Column="0">
                         <Grid Margin="0,0,0,10">
                             <Grid.ColumnDefinitions>
@@ -956,8 +1145,6 @@
                         <ProgressBar Style="{StaticResource Style.ProgressBar}"
                                      Minimum="0" Maximum="100"
                                      Value="{Binding OperationProgress}" />
-
-                        <!-- Live metrics row -->
                         <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                             <Border Style="{StaticResource Style.InfoChip}" Margin="0,0,8,0">
                                 <StackPanel Orientation="Horizontal">
@@ -970,7 +1157,6 @@
                                                VerticalAlignment="Center" />
                                 </StackPanel>
                             </Border>
-                            <!-- Live ratio — compress mode only -->
                             <Border Style="{StaticResource Style.InfoChip}"
                                     Visibility="{Binding IsCompressMode,
                                                  Converter={StaticResource BoolToVisibility}}">
@@ -987,53 +1173,38 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <!-- Divider -->
-                    <Rectangle Grid.Column="1"
-                               Width="1"
-                               Fill="{StaticResource Brush.Border}"
-                               Margin="0,4" />
+                    <Rectangle Grid.Column="1" Width="1"
+                               Fill="{StaticResource Brush.Border}" Margin="0,4" />
 
-                    <!-- Right: Final results (shown after completion) -->
                     <UniformGrid Grid.Column="2" Columns="4" VerticalAlignment="Center">
-
-                        <!-- Final Ratio -->
                         <StackPanel Margin="16,0"
                                     Visibility="{Binding IsCompressMode,
                                                  Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="FINAL RATIO"
-                                       Style="{StaticResource Style.Label}"
-                                       Margin="0,0,0,4" />
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding FinalCompressionRatio}"
                                        Style="{StaticResource Style.StatValue}" />
                         </StackPanel>
-
-                        <!-- Space Saved -->
                         <StackPanel Margin="16,0"
                                     Visibility="{Binding IsCompressMode,
                                                  Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="SPACE SAVED"
-                                       Style="{StaticResource Style.Label}"
-                                       Margin="0,0,0,4" />
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding SpaceSaved}"
                                        Style="{StaticResource Style.StatValue}"
                                        Foreground="{StaticResource Brush.Success}" />
                         </StackPanel>
-
-                        <!-- SNR dB -->
                         <StackPanel Margin="16,0"
                                     Visibility="{Binding IsCompressMode,
                                                  Converter={StaticResource BoolToVisibility}}">
                             <TextBlock Text="SNR"
-                                       Style="{StaticResource Style.Label}"
-                                       Margin="0,0,0,4" />
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding SnrDb}"
                                        Style="{StaticResource Style.StatValue}"
                                        Foreground="{StaticResource Brush.Amber}" />
                         </StackPanel>
-
-                        <!-- Duration -->
                         <StackPanel Margin="16,0">
-                            <TextBlock >
+                            <TextBlock>
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
                                         <Setter Property="Text" Value="COMPRESS TIME" />
@@ -1051,7 +1222,6 @@
                     </UniformGrid>
                 </Grid>
             </Border>
-
         </Grid>
     </Grid>
 </Window>

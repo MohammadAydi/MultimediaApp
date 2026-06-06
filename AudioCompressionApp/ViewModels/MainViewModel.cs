@@ -22,23 +22,31 @@ namespace AudioCompressionApp.ViewModels;
 /// Main ViewModel for the Audio Compression application.
 ///
 /// UI → ViewModel binding map:
-///   - Mode selection       → IsCompressMode / IsDecompressMode
-///   - File drop / browse   → OpenAudioCommand / OpenCompressedCommand / LoadAudioFile()
-///   - Playback             → PlayCommand / PauseCommand / StopCommand
-///   - Compression          → CompressCommand / CancelCompressionCommand
-///   - Decompression        → DecompressCommand / CancelDecompressionCommand
-///   - Reset                → ResetCommand
-///   - Algorithm selection  → SelectedAlgorithm (drives AlgorithmSettingsViewModel)
-///   - Progress feedback    → CompressionProgress / ProcessingSpeed / CompressionRatio
-///   - Final results        → FinalCompressionRatio / FinalDuration / SnrDb
-///   - File info            → SourceFileInfo / CompressedFileInfo
-///   - Activity log         → Logs
+///   - File explorer tree  → FileSystemTree (FileSystemTreeViewModel)
+///   - Mode (read-only)    → IsCompressMode / IsDecompressMode
+///                           Set automatically by file extension — never by the user.
+///   - Playback            → PlayCommand / PauseCommand / StopCommand
+///   - Compression         → CompressCommand / CancelCompressionCommand
+///   - Decompression       → DecompressCommand / CancelDecompressionCommand
+///   - Reset               → ResetCommand
+///   - Algorithm selection → SelectedAlgorithm (drives AlgorithmSettingsViewModel)
+///   - Progress feedback   → OperationProgress / ProcessingSpeed / LiveCompressionRatio
+///   - Final results       → FinalCompressionRatio / FinalDuration / SnrDb / SpaceSaved
+///   - File info           → SourceFile* / CompressedFile*
+///   - Activity log        → Logs
 /// </summary>
 public partial class MainViewModel : ObservableObject {
-    // ── Dependencies ─────────────────────────────────────────
+    // ── Dependencies ──────────────────────────────────────────────────────────
     private readonly AudioFileService _audioFileService;
     private readonly AudioPlaybackService _audioPlaybackService;
     private CancellationTokenSource? _cancellationTokenSource;
+
+    // ── Extensions that drive automatic mode detection ────────────────────────
+    private static readonly string[] AudioExtensions =
+        [".wav", ".mp3"];
+
+    private static readonly string[] CompressedExtensions =
+        [".admaydi", ".nlqalaa", ".dmjomaat", ".dpcmkasem", ".pdcmanar"];
 
     public MainViewModel(
         AudioFileService audioFileService,
@@ -46,7 +54,6 @@ public partial class MainViewModel : ObservableObject {
         _audioFileService = audioFileService;
         _audioPlaybackService = audioPlaybackService;
 
-        // Populate algorithm list — displayed in the algorithm selector ComboBox
         Algorithms = [
             new DpcmCompressionAlgorithm(),
             new AdaptiveDeltaModulationCompressionAlgorithm(),
@@ -54,28 +61,42 @@ public partial class MainViewModel : ObservableObject {
             new NonlinearQuantizationCompressionAlgorithm(),
             new PredictiveDifferentialCodingCompressionAlgorithm(),
         ];
+
+        // Wire the tree's file-selection callback to our routing method.
+        // The tree knows nothing about audio — it just reports a file path.
+        FileSystemTree = new FileSystemTreeViewModel {
+            FileSelected = RouteSelectedFile,
+        };
     }
 
     // =========================================================
-    // MODE SWITCHING
-    // The UI uses two mutually exclusive modes:
-    //   Compress   — load a raw audio file → compress it
-    //   Decompress — load a compressed file → decompress + play
+    // FILE SYSTEM TREE
     // =========================================================
 
+    /// <summary>
+    /// Drives the left-panel explorer TreeView.
+    /// Bound directly to the View — the tree's open-folder button,
+    /// root nodes, and selection all live here.
+    /// </summary>
+    public FileSystemTreeViewModel FileSystemTree { get; }
+
+    // =========================================================
+    // MODE  (read-only — set by extension, never by user)
+    // =========================================================
+
+    /// <summary>
+    /// True when a raw audio file (.wav / .mp3) is selected.
+    /// Set automatically when the user picks a file in the tree.
+    /// The UI displays this as a read-only badge — no click handler.
+    /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDecompressMode))]
     [NotifyCanExecuteChangedFor(nameof(CompressCommand))]
     [NotifyCanExecuteChangedFor(nameof(DecompressCommand))]
     private bool _isCompressMode = true;
 
-    /// <summary>True when the user is in Decompress mode (inverse of IsCompressMode).</summary>
+    /// <summary>True when the selected file is a compressed audio file.</summary>
     public bool IsDecompressMode => !IsCompressMode;
-
-    partial void OnIsCompressModeChanged(bool value) {
-        // Clear state when switching modes so stale data never shows
-        Reset();
-    }
 
     // =========================================================
     // ALGORITHM SELECTION
@@ -92,8 +113,7 @@ public partial class MainViewModel : ObservableObject {
 
     /// <summary>
     /// Returns a ViewModel that exposes the editable settings for
-    /// the currently selected algorithm. The UI binds the dynamic
-    /// settings panel to this property.
+    /// the currently selected algorithm.
     /// PLACEHOLDER — implement by returning a typed settings VM.
     /// </summary>
     public AlgorithmSettingsViewModel? AlgorithmSettingsViewModel =>
@@ -116,8 +136,7 @@ public partial class MainViewModel : ObservableObject {
     [NotifyCanExecuteChangedFor(nameof(ResetCommand))]
     private AudioFileModel? _currentAudioFile;
 
-    // ── Formatted proxy properties bound by the View ──────────
-    public string SourceFileName => _currentAudioFile?.FileName ?? "No file loaded";
+    public string SourceFileName => _currentAudioFile?.FileName ?? "No file selected";
     public string SourceSampleRate => _currentAudioFile is { } f ? $"{f.SampleRate} Hz" : "—";
 
     public string SourceChannels => _currentAudioFile is { } f
@@ -201,17 +220,12 @@ public partial class MainViewModel : ObservableObject {
     // REAL-TIME PROGRESS
     // =========================================================
 
-    /// <summary>0 – 100 progress value bound to the ProgressBar.</summary>
     [ObservableProperty] private double _operationProgress;
-
-    /// <summary>Live processing throughput, e.g. "128 000 samples/s".</summary>
     [ObservableProperty] private string _processingSpeed = "—";
-
-    /// <summary>Live compression ratio during compression, e.g. "2.34:1".</summary>
     [ObservableProperty] private string _liveCompressionRatio = "—";
 
     // =========================================================
-    // FINAL RESULTS  (shown after operation completes)
+    // FINAL RESULTS
     // =========================================================
 
     [ObservableProperty] [NotifyPropertyChangedFor(nameof(HasResults))]
@@ -221,10 +235,8 @@ public partial class MainViewModel : ObservableObject {
     private string _finalDuration = "—";
 
     [ObservableProperty] private string _snrDb = "—";
-
     [ObservableProperty] private string _spaceSaved = "—";
 
-    /// <summary>True once a compression or decompression run has finished.</summary>
     public bool HasResults =>
         _finalCompressionRatio != "—" || _finalDuration != "—";
 
@@ -238,64 +250,49 @@ public partial class MainViewModel : ObservableObject {
         Logs.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
 
     // =========================================================
-    // COMMANDS — MODE SWITCHING
+    // FILE ROUTING  (replaces the old manual Open* commands)
+    //
+    // This is the single entry point for all file selection:
+    // tree clicks, drag-drop onto the tree, and drop onto the main area.
+    // The extension determines the mode — the user has no control over it.
     // =========================================================
 
-    /// <summary>Switches the UI to Compress mode.</summary>
-    [RelayCommand]
-    private void SetCompressMode() => IsCompressMode = true;
+    /// <summary>
+    /// Routes a file path to the correct loader based on its extension.
+    /// Called from FileSystemTreeViewModel.FileSelected and from the
+    /// drag-drop handler in MainWindow.xaml.cs.
+    /// </summary>
+    public void RouteSelectedFile(string filePath) {
+        string ext = Path.GetExtension(filePath).ToLowerInvariant();
 
-    /// <summary>Switches the UI to Decompress mode.</summary>
-    [RelayCommand]
-    private void SetDecompressMode() => IsCompressMode = false;
-
-    // =========================================================
-    // COMMANDS — OPEN FILE
-    // =========================================================
-
-    /// <summary>Opens a native file dialog for raw audio files.</summary>
-    [RelayCommand]
-    private void OpenAudio() {
-        var dialog = new OpenFileDialog {
-            Title = "Open Audio File",
-            Filter = "Audio Files|*.wav;*.mp3|WAV Files|*.wav|MP3 Files|*.mp3",
-            Multiselect = false,
-        };
-
-        if (dialog.ShowDialog() == true)
-            LoadAudioFile(dialog.FileName);
+        if (AudioExtensions.AsSpan().Contains(ext)) {
+            IsCompressMode = true;
+            ResetWorkArea();
+            LoadAudioFile(filePath);
+        }
+        else if (CompressedExtensions.AsSpan().Contains(ext)) {
+            IsCompressMode = false;
+            ResetWorkArea();
+            LoadCompressedFile(filePath);
+        }
+        else {
+            AddLog($"Unsupported file type: {Path.GetFileName(filePath)}");
+        }
     }
-
-    /// <summary>Opens a native file dialog for already-compressed files.</summary>
-    [RelayCommand]
-    private void OpenCompressed() {
-        var dialog = new OpenFileDialog {
-            Title = "Open Compressed Audio File",
-            Filter = $"Compressed Audio|*.admAydi;*.nlqAlaa;*.dmJomaat;*.dpcmKasem;*.pdcManar|All Files|*.*",
-            Multiselect = false,
-        };
-
-        if (dialog.ShowDialog() == true)
-            LoadCompressedFile(dialog.FileName);
-    }
-
-    // ── Public entry points used by drag-and-drop in the code-behind ──
 
     /// <summary>
     /// Loads and validates a raw audio file from a file path.
-    /// Called from drag-drop code-behind and OpenAudio command.
-    /// PLACEHOLDER — add validation + metadata reading.
     /// </summary>
     public void LoadAudioFile(string filePath) {
         if (!_audioFileService.IsSupportedAudioFile(filePath)) {
-            AddLog($"Unsupported file: {System.IO.Path.GetFileName(filePath)}");
+            AddLog($"Unsupported audio file: {Path.GetFileName(filePath)}");
             return;
         }
 
         using var reader = new WaveFileReader(filePath);
         CurrentAudioFile = new AudioFileModel {
             FilePath = filePath,
-            FileName = System.IO.Path.GetFileName(filePath),
+            FileName = Path.GetFileName(filePath),
             SampleRate = reader.WaveFormat.SampleRate,
             Channels = reader.WaveFormat.Channels,
             BitsPerSample = reader.WaveFormat.BitsPerSample,
@@ -307,7 +304,6 @@ public partial class MainViewModel : ObservableObject {
 
     /// <summary>
     /// Loads a compressed audio file.
-    /// PLACEHOLDER — add header/metadata parsing per format.
     /// </summary>
     public async Task LoadCompressedFile(string filePath) {
         string magic = await _audioFileService.GetMagicName(filePath);
@@ -328,7 +324,6 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() {
-        // PLACEHOLDER — call _audioPlaybackService.Play(...)
         if (CurrentAudioFile == null || string.IsNullOrWhiteSpace(CurrentAudioFile.FilePath))
             return;
 
@@ -342,7 +337,6 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand(CanExecute = nameof(CanPause))]
     private void Pause() {
-        // PLACEHOLDER — call _audioPlaybackService.Pause(...)
         IsPlayingSource = false;
         IsSourcePaused = true;
         AddLog("Playback paused");
@@ -366,7 +360,6 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand(CanExecute = nameof(CanPlayDecompressed))]
     private void PlayDecompressed() {
-        // PLACEHOLDER — play the reconstructed WAV
         IsPlayingDecompressed = true;
         AddLog("Playing decompressed audio");
     }
@@ -375,7 +368,6 @@ public partial class MainViewModel : ObservableObject {
 
     [RelayCommand(CanExecute = nameof(CanStopDecompressed))]
     private void StopDecompressed() {
-        // PLACEHOLDER — stop decompressed playback
         IsPlayingDecompressed = false;
         AddLog("Stopped decompressed playback");
     }
@@ -405,6 +397,7 @@ public partial class MainViewModel : ObservableObject {
                 LiveCompressionRatio = $"{progress.CompressionRatio:F2}:1";
                 ProcessingSpeed = $"{progress.ProcessingSpeed:F0} samples/s";
             });
+
         try {
             short[] samples = await _audioFileService.GetAudioSamples(CurrentAudioFile.FilePath);
             var context = new CompressionContext {
@@ -412,28 +405,22 @@ public partial class MainViewModel : ObservableObject {
                 Settings = CreateSettingsForAlgorithm(SelectedAlgorithm),
             };
             CompressionResult result = await SelectedAlgorithm.CompressAsync(
-                context,
-                progressReporter,
-                _cancellationTokenSource.Token);
+                context, progressReporter, _cancellationTokenSource.Token);
+
             string? fileName = SaveCompressedFile();
             await _audioFileService.SaveBytesToFileAsync(fileName, result.CompressedData);
 
-            FinalCompressionRatio =
-                $"{result.CompressionRatio:F2}:1";
-            FinalDuration =
-                $"{result.CompressionTime.TotalMilliseconds:F0} ms";
-            long originalBytes =
-                samples.Length * sizeof(short);
-            long compressedBytes =
-                result.CompressedData.Length;
-            double saved =
-                (1.0 - (double)compressedBytes / originalBytes) * 100.0;
+            FinalCompressionRatio = $"{result.CompressionRatio:F2}:1";
+            FinalDuration = $"{result.CompressionTime.TotalMilliseconds:F0} ms";
+
+            long originalBytes = samples.Length * sizeof(short);
+            long compressedBytes = result.CompressedData.Length;
+            double saved = (1.0 - (double)compressedBytes / originalBytes) * 100.0;
             SpaceSaved = $"{saved:F1}%";
             OperationProgress = 100;
 
-            AddLog("Compression complete (placeholder)");
+            AddLog($"Compression complete — {FinalCompressionRatio} in {FinalDuration}");
         }
-
         catch (OperationCanceledException) {
             AddLog("Compression canceled");
             MessageBox.Show("Compression canceled.");
@@ -448,42 +435,21 @@ public partial class MainViewModel : ObservableObject {
         }
     }
 
-    private String? SaveCompressedFile() {
+    private string? SaveCompressedFile() {
         string defaultFileName =
-            $"{Path.GetFileNameWithoutExtension(CurrentAudioFile.FilePath)}" +
-            "_compressed";
+            $"{Path.GetFileNameWithoutExtension(CurrentAudioFile!.FilePath)}_compressed";
         string filter =
-            $"{SelectedAlgorithm.Name} Files (*.{SelectedAlgorithm.Extension})| *.{SelectedAlgorithm.Extension}";
+            $"{SelectedAlgorithm!.Name} Files (*.{SelectedAlgorithm.Extension})|*.{SelectedAlgorithm.Extension}";
+
         var dialog = new SaveFileDialog {
             FileName = defaultFileName,
             Filter = filter,
             AddExtension = true,
-            OverwritePrompt = true
+            OverwritePrompt = true,
         };
 
-        return dialog.ShowDialog() == true
-            ? dialog.FileName
-            : null;
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
-
-    private String? SaveDecompressedFile() {
-        string defaultFileName =
-            $"{Path.GetFileNameWithoutExtension(CompressedFileInfo.FilePath)}" +
-            "_Uncompressed";
-        string filter =
-            "Uncompressed Files (*.wav)| *.wav";
-        var dialog = new SaveFileDialog {
-            FileName = defaultFileName,
-            Filter = filter,
-            AddExtension = true,
-            OverwritePrompt = true
-        };
-
-        return dialog.ShowDialog() == true
-            ? dialog.FileName
-            : null;
-    }
-
 
     private bool CanCompress() =>
         IsAudioLoaded && !IsCompressing && SelectedAlgorithm is not null;
@@ -517,29 +483,8 @@ public partial class MainViewModel : ObservableObject {
             byte[] wav = WaveFileBuilder.CreateWaveFile(result);
             string? filePath = SaveDecompressedFile();
             await _audioFileService.SaveBytesToFileAsync(filePath, wav);
-            AddLog("Decompression complete (placeholder)");
+            AddLog("Decompression complete");
         }
-        // try {
-        //     var startTime = DateTime.Now;
-        //     var random = new Random();
-        //
-        //     for (int i = 0; i <= 100; i++) {
-        //         _cancellationTokenSource.Token.ThrowIfCancellationRequested();
-        //
-        //         OperationProgress = i;
-        //
-        //         ProcessingSpeed =
-        //             $"{random.Next(80000, 400000):N0} samples/s";
-        //
-        //         await Task.Delay(30, _cancellationTokenSource.Token);
-        //     }
-        //
-        //     var elapsed = DateTime.Now - startTime;
-        //
-        //     FinalDuration = $"{elapsed.TotalMilliseconds:F0} ms";
-        //
-        //     AddLog("Decompression complete");
-        // }
         catch (OperationCanceledException) {
             AddLog("Decompression cancelled");
         }
@@ -552,6 +497,20 @@ public partial class MainViewModel : ObservableObject {
         finally {
             IsDecompressing = false;
         }
+    }
+
+    private string? SaveDecompressedFile() {
+        string defaultFileName =
+            $"{Path.GetFileNameWithoutExtension(CompressedFileInfo!.FilePath)}_Uncompressed";
+
+        var dialog = new SaveFileDialog {
+            FileName = defaultFileName,
+            Filter = "Uncompressed Files (*.wav)|*.wav",
+            AddExtension = true,
+            OverwritePrompt = true,
+        };
+
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
 
     private bool CanDecompress() =>
@@ -572,7 +531,11 @@ public partial class MainViewModel : ObservableObject {
     [RelayCommand(CanExecute = nameof(CanReset))]
     private void Reset() {
         _audioPlaybackService.Stop();
+        ResetWorkArea();
+        Logs.Clear();
+    }
 
+    private void ResetWorkArea() {
         CurrentAudioFile = null;
         CompressedFileInfo = null;
         IsAudioLoaded = false;
@@ -587,7 +550,6 @@ public partial class MainViewModel : ObservableObject {
         FinalDuration = "—";
         SnrDb = "—";
         SpaceSaved = "—";
-        Logs.Clear();
     }
 
     private bool CanReset() =>
@@ -603,23 +565,16 @@ public partial class MainViewModel : ObservableObject {
         _ => $"{bytes / (1024.0 * 1024.0):F2} MB",
     };
 
-    /// <summary>
-    /// Factory that returns a typed settings ViewModel for the given algorithm.
-    /// PLACEHOLDER — create one SettingsViewModel per algorithm type.
-    /// </summary>
     private static AlgorithmSettingsViewModel? CreateSettingsViewModel(
         ICompressionAlgorithm algorithm) {
-        // TODO: return a strongly-typed settings VM per algorithm, e.g.:
-        //   DpcmCompressionAlgorithm    → DpcmSettingsViewModel
-        //   AdaptiveDeltaModulation...  → AdaptiveDeltaModulationSettingsViewModel
-        // For now return a generic placeholder so the UI has something to bind to.
+        // TODO: return a strongly-typed settings VM per algorithm
         return new AlgorithmSettingsViewModel(algorithm.Name);
     }
 
     private CompressionSettings CreateSettingsForAlgorithm(ICompressionAlgorithm algorithm) {
         if (CurrentAudioFile == null)
-            throw new InvalidOperationException(
-                "No audio file loaded");
+            throw new InvalidOperationException("No audio file loaded");
+
         return algorithm switch {
             DpcmCompressionAlgorithm => new DpcmSettings {
                 SampleRate = CurrentAudioFile.SampleRate,
@@ -627,52 +582,41 @@ public partial class MainViewModel : ObservableObject {
                 BitsPerSample = CurrentAudioFile.BitsPerSample,
                 QuantizationStep = 8,
             },
-
             AdaptiveDeltaModulationCompressionAlgorithm =>
                 new AdaptiveDeltaModulationSettings {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
-                    // InitialStepSize = 2
                 },
-
             DeltaModulationCompressionAlgorithm =>
                 new DeltaModulationSettings {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
                 },
-
             NonlinearQuantizationCompressionAlgorithm =>
                 new NonlinearDifferentialCodingSettings {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
-                    QuantizationBits = (int)QuantizationLevels
+                    QuantizationBits = (int)QuantizationLevels,
                 },
-
             PredictiveDifferentialCodingCompressionAlgorithm =>
                 new PredictiveDifferentialCodingSettings {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
                 },
-
             _ => throw new NotSupportedException(
-                $"Algorithm {algorithm.GetType().Name} is not supported")
+                $"Algorithm {algorithm.GetType().Name} is not supported"),
         };
     }
 }
 
 // ─────────────────────────────────────────────────────────────
 // PLACEHOLDER VIEW-MODELS for algorithm settings
-// Replace with one strongly-typed VM per algorithm.
 // ─────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Generic placeholder settings ViewModel shown in the algorithm settings panel.
-/// Replace with one SettingsViewModel per algorithm.
-/// </summary>
 public partial class AlgorithmSettingsViewModel : ObservableObject {
     public AlgorithmSettingsViewModel(string algorithmName) {
         AlgorithmName = algorithmName;
@@ -680,15 +624,6 @@ public partial class AlgorithmSettingsViewModel : ObservableObject {
 
     public string AlgorithmName { get; }
 
-    // PLACEHOLDER properties — replace with algorithm-specific settings.
-    // Example for DPCM:
-    //   [ObservableProperty] private int _quantizationStep = 8;
-    //   [ObservableProperty] private int _sampleRate = 44100;
-
     [ObservableProperty] private double _setting1 = 8;
     [ObservableProperty] private double _setting2 = 100;
 }
-
-// ─────────────────────────────────────────────────────────────
-// PLACEHOLDER DATA MODELS (add to Models/ folder in your project)
-// ─────────────────────────────────────────────────────────────

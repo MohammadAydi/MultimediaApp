@@ -10,6 +10,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
     private double _reconstructed;
 
     private double _stepSize;
+    private bool? _previousBit;
 
     private AdaptiveDeltaModulationSettings? _settings;
 
@@ -62,6 +63,18 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         //     $"Transmit={transmitted}, " +
         //     $"UpdatedEstimate={_reconstructed}");
     }
+    
+    private void AdaptStepSize(
+        bool currentBit)
+    {
+        if(_previousBit ==null) {
+            _previousBit = currentBit;
+            return;
+        }
+        
+        
+        _previousBit = currentBit;
+    }
 
     protected override double CalculateCurrentRatio() {
         return 1.0;
@@ -75,6 +88,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         CompressedData = [];
         _reconstructed = 0;
         _stepSize = _settings.InitialStepSize;
+        _previousBit = null;
     }
 
     protected override void FinalizeEncoding() {
@@ -94,27 +108,27 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
         CompressedData = AdmFileWriter.Write(header, payload);
 
-        Console.WriteLine("=== Top 20 Most Common Differences ===");
-
-        foreach (var kv in _diffHistogram
-                     .OrderByDescending(x => x.Value)
-                     .Take(20)) {
-            Console.WriteLine(
-                $"{kv.Key,6} - {kv.Key + 99,6} : {kv.Value}");
-        }
-
-        int maxDiff = _diffHistogram.Keys.Max();
-
-        Console.WriteLine($"Max Diff = {maxDiff}");
-
-        long total =
-            _diffHistogram.Sum(x => (long)x.Key * x.Value);
-
-        long count =
-            _diffHistogram.Sum(x => x.Value);
-
-        Console.WriteLine(
-            $"Average Diff ≈ {(double)total / count:F2}");
+        // Console.WriteLine("=== Top 20 Most Common Differences ===");
+        //
+        // foreach (var kv in _diffHistogram
+        //              .OrderByDescending(x => x.Value)
+        //              .Take(20)) {
+        //     Console.WriteLine(
+        //         $"{kv.Key,6} - {kv.Key + 99,6} : {kv.Value}");
+        // }
+        //
+        // int maxDiff = _diffHistogram.Keys.Max();
+        //
+        // Console.WriteLine($"Max Diff = {maxDiff}");
+        //
+        // long total =
+        //     _diffHistogram.Sum(x => (long)x.Key * x.Value);
+        //
+        // long count =
+        //     _diffHistogram.Sum(x => x.Value);
+        //
+        // Console.WriteLine(
+        //     $"Average Diff ≈ {(double)total / count:F2}");
     }
 
     public override DecompressionResult Decompress(
