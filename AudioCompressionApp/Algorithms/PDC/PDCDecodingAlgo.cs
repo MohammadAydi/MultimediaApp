@@ -3,9 +3,9 @@ using AudioCompressionApp.Models;
 
 namespace AudioCompressionApp.Algorithms;
 
-public class DeltaModulationCompressionAlgorithm : CompressionAlgorithmBase{
-    public override string Name => "Delta Modulation";
-    public override string Extension => "dmJomaat";
+public class PDCDecodingAlgo : DecodingAlgoBase {
+    public override string Name => "Predictive Differential Coding";
+
     protected override long ParseInput(byte[] compressedData) {
         throw new NotImplementedException();
     }
@@ -15,14 +15,6 @@ public class DeltaModulationCompressionAlgorithm : CompressionAlgorithmBase{
     }
 
     protected override DecompressionResult BuildDecompressionResult() {
-        throw new NotImplementedException();
-    }
-
-    protected override void ProcessSample(int index, CompressionContext context) {
-        throw new NotImplementedException();
-    }
-
-    protected override double CalculateCurrentRatio() {
         throw new NotImplementedException();
     }
 }

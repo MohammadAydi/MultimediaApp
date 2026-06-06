@@ -13,26 +13,4 @@ public interface ICompressionAlgorithm {
         CompressionContext context,
         IProgress<CompressionProgressModel> progress,
         CancellationToken cancellationToken);
-
-    public DecompressionResult Decompress(byte[] compressedData);
-
-    public Task<DecompressionResult> DecompressAsync(
-        byte[] compressedData,
-        IProgress<CompressionProgressModel>? progress = null,
-        CancellationToken cancellationToken = default);
-}
-
-public static class CompressionAlgorithmFactory {
-    public static ICompressionAlgorithm Create(string magic) {
-        return magic switch {
-            AdmHeader.StringMagicNumber => new AdaptiveDeltaModulationCompressionAlgorithm(),
-            DpcmHeader.StringMagicNumber => new DpcmCompressionAlgorithm(),
-            NonlinearQuantizationHeader.StringMagicNumber => new NonlinearQuantizationCompressionAlgorithm(),
-            // "MUL1" => new N(),
-            // "ALAW" => new ALawAlgorithm(),
-
-            _ => throw new InvalidDataException(
-                $"Unknown compression format '{magic}'.")
-        };
-    }
 }

@@ -360,11 +360,11 @@ public partial class MainViewModel : ObservableObject {
     /// </summary>
     public async Task LoadCompressedFile(string filePath) {
         string magic = await _audioFileService.GetMagicName(filePath);
-        SelectedAlgorithm = CompressionAlgorithmFactory.Create(magic);
+        IDecodingAlgo decodingAlgo = DecodingAlgorithmFactory.Create(magic);
         CompressedFileInfo = new CompressedFileModel {
             FilePath = filePath,
             FileName = Path.GetFileName(filePath),
-            AlgorithmName = SelectedAlgorithm.Name,
+            AlgorithmName = decodingAlgo.Name,
             // TODO: read SampleRate, Channels, BitsPerSample from the file header
             // e.g. SampleRate    = header.SampleRate,
             //      Channels      = header.Channels,
@@ -544,8 +544,9 @@ public partial class MainViewModel : ObservableObject {
         try
         {
             byte[] fileBytes = await _audioFileService.GetFileBytes(CompressedFileInfo.FilePath);
-
-            DecompressionResult result = await SelectedAlgorithm.DecompressAsync(
+            string magic = await _audioFileService.GetMagicName(CompressedFileInfo.FilePath);
+            IDecodingAlgo decodingAlgo = DecodingAlgorithmFactory.Create(magic);
+            DecompressionResult result = await decodingAlgo.DecompressAsync(
                 fileBytes,
                 progressReporter,
                 _cancellationTokenSource.Token);

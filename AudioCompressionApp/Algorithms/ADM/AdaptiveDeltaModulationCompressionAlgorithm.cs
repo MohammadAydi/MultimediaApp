@@ -6,7 +6,7 @@ using AudioCompressionApp.Models.Settings;
 namespace AudioCompressionApp.Algorithms;
 
 public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmBase {
-    private readonly List<bool> _encodedBits = [];
+    private List<bool> _encodedBits = [];
     private double _reconstructed = 0;
 
     private double _stepSize;
@@ -16,8 +16,8 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
     private CompressionContext? _context;
 
-    private AdmHeader _header;
-    private List<bool> _bits = [];
+    
+    
     public long BitsWritten { get; private set; }
     private int _processedSamples;
 
@@ -145,63 +145,5 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         //     $"Average Diff ≈ {(double)total / count:F2}");
     }
 
-    public override DecompressionResult Decompress(
-        byte[] compressedData) {
-        var (header, payload) = AdmFileReader.Read(compressedData);
-        List<bool> bits = AdmBitPacker.UnpackBits(payload, header.SampleCount);
-        short[] samples = new short[header.SampleCount];
-        double reconstructed = 0;
-
-        double stepSize =
-            header.InitialStepSize;
-
-        for (int i = 0; i < bits.Count; i++) {
-            double previousReconstructed = reconstructed;
-
-            if (bits[i]) {
-                reconstructed += stepSize;
-            }
-            else {
-                reconstructed -= stepSize;
-            }
-
-            // Console.WriteLine(
-            //     $"[{i}] " +
-            //     $"Bit={(bits[i] ? 1 : 0)}, " +
-            //     $"PreviousEstimate={previousReconstructed}, " +
-            //     $"UpdatedEstimate={reconstructed}");
-
-            samples[i] = (short)Math.Clamp(
-                reconstructed,
-                short.MinValue,
-                short.MaxValue);
-        }
-
-        return new DecompressionResult(samples, header.SampleRate, header.Channels, header.BitsPerSample);
-    }
-
-    protected override long ParseInput(byte[] compressedData) {
-        var (header, payload) = AdmFileReader.Read(compressedData);
-        _header = header;
-        _bits = AdmBitPacker.UnpackBits(payload, header.SampleCount);
-        return header.SampleCount;
-    }
-
-    protected override void DecodeSample(long index) {
-        if (_bits[(int)index])
-            _reconstructed += _header.InitialStepSize;
-        else
-            _reconstructed -= _header.InitialStepSize;
-
-        DecompressedSamples[index] = (short)Math.Clamp(
-            _reconstructed,
-            short.MinValue,
-            short.MaxValue);
-    }
-
-    protected override DecompressionResult BuildDecompressionResult()
-        => new(_header.SampleCount > 0 ? DecompressedSamples : [],
-            _header.SampleRate,
-            _header.Channels,
-            _header.BitsPerSample);
+    
 }

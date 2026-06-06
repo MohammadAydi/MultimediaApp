@@ -8,26 +8,23 @@ using AudioCompressionApp.Models.Settings;
 
 namespace AudioCompressionApp.Algorithms.Nonlinear;
 
-public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgorithmBase
-{
+public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgorithmBase {
     private const int Mu = 255;
 
     private NonlinearDifferentialCodingSettings? _settings;
     private CompressionContext? _context;
 
-    private List<int> _quantized = new();
+    private readonly List<int> _quantized = new();
 
     public override string Name => "Nonlinear Quantization (μ-law)";
     public override string Extension => "nlqAlaa";
+
     
     private NonlinearQuantizationHeader _header;
-    private int[] _Decodedquantized = [];
-
     private double _lnMuPlus1;
-    private int    _levels;
+    private int _levels;
 
-    protected override void Validate(CompressionContext context)
-    {
+    protected override void Validate(CompressionContext context) {
         if (context.Samples is null || context.Samples.Length == 0)
             throw new InvalidDataException("No audio samples found in the compression context.");
 
@@ -37,15 +34,13 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
                 $"but got: {context.Settings?.GetType().Name ?? "null"}");
     }
 
-    protected override void Initialize(CompressionContext context)
-    {
+    protected override void Initialize(CompressionContext context) {
         _context = context;
         _settings = (NonlinearDifferentialCodingSettings)context.Settings;
         _quantized.Clear();
     }
 
-    protected override void ProcessSample(int index, CompressionContext context)
-    {
+    protected override void ProcessSample(int index, CompressionContext context) {
         short sample = context.Samples[index];
 
         // Normalize to [-1, +1]
@@ -55,8 +50,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
         double sign = Math.Sign(normalized);
         double absx = Math.Abs(normalized);
         double compressed = 0.0;
-        if (absx > 0)
-        {
+        if (absx > 0) {
             compressed = sign * Math.Log(1 + Mu * absx) / Math.Log(1 + Mu);
         }
 
@@ -70,8 +64,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
         _quantized.Add(quantized);
     }
 
-    protected override void FinalizeEncoding()
-    {
+    protected override void FinalizeEncoding() {
         if (_context is null || _settings is null)
             return;
 
@@ -80,23 +73,19 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
 
         // Pack quantized values into bytes (bit packing)
         byte[] payload;
-        if (qbits == 8)
-        {
+        if (qbits == 8) {
             payload = _quantized.Select(i => (byte)i).ToArray();
         }
-        else
-        {
+        else {
             int totalBits = _quantized.Count * qbits;
             int byteCount = (totalBits + 7) / 8;
             payload = new byte[byteCount];
 
             int bitIndex = 0;
-            foreach (int value in _quantized)
-            {
+            foreach (int value in _quantized) {
                 int bitsLeft = qbits;
                 int v = value;
-                while (bitsLeft > 0)
-                {
+                while (bitsLeft > 0) {
                     int bytePos = bitIndex / 8;
                     int offset = bitIndex % 8;
                     int space = 8 - offset;
@@ -114,8 +103,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
             }
         }
 
-        var header = new NonlinearQuantizationHeader
-        {
+        var header = new NonlinearQuantizationHeader {
             SampleRate = _context.Settings.SampleRate,
             Channels = _context.Settings.Channels,
             BitsPerSample = _context.Settings.BitsPerSample,
@@ -126,8 +114,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
         CompressedData = NonlinearQuantizationFileWriter.Write(header, payload);
     }
 
-    protected override double CalculateCurrentRatio()
-    {
+    protected override double CalculateCurrentRatio() {
         if (_context is null || _settings is null) return 0.0;
 
         long originalBits = (long)_context.Samples.Length * 16;
@@ -136,128 +123,4 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
         return (double)originalBits / compressedBits;
     }
 
-    public override DecompressionResult Decompress(byte[] compressedData)
-    {
-        var (header, payload) = NonlinearQuantizationFileReader.Read(compressedData);
-
-        int qbits = Math.Max(1, header.QuantizationBits);
-        long sampleCount = header.SampleCount;
-        int levels = 1 << qbits;
-
-        int[] quantized = new int[sampleCount];
-
-        if (qbits == 8)
-        {
-            for (int i = 0; i < sampleCount; i++)
-                quantized[i] = payload[i];
-        }
-        else
-        {
-            int bitIndex = 0;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                int bitsLeft = qbits;
-                int v = 0;
-                int shift = 0;
-                while (bitsLeft > 0)
-                {
-                    int bytePos = bitIndex / 8;
-                    int offset = bitIndex % 8;
-                    int space = 8 - offset;
-                    int take = Math.Min(space, bitsLeft);
-
-                    int chunk = (payload[bytePos] >> offset) & ((1 << take) - 1);
-                    v |= (chunk << shift);
-
-                    shift += take;
-                    bitsLeft -= take;
-                    bitIndex += take;
-                }
-
-                quantized[i] = v;
-            }
-        }
-
-        short[] samples = new short[sampleCount];
-
-        double lnMuPlus1 = Math.Log(1 + Mu);
-        for (int i = 0; i < sampleCount; i++)
-        {
-            double y = (double)quantized[i] / (levels - 1) * 2.0 - 1.0; // in [-1,1]
-            double sign = Math.Sign(y);
-            double absy = Math.Abs(y);
-            double expanded = 0.0;
-            if (absy > 0)
-            {
-                expanded = sign * (Math.Exp(absy * lnMuPlus1) - 1.0) / Mu;
-            }
-
-            double pcm = expanded * 32767.0;
-            int sval = (int)Math.Round(pcm);
-            sval = Math.Clamp(sval, short.MinValue, short.MaxValue);
-            samples[i] = (short)sval;
-        }
-
-        return new DecompressionResult(samples, header.SampleRate, (short)header.Channels, (short)header.BitsPerSample);
-    }
-    
-    protected override long ParseInput(byte[] compressedData)
-    {
-        var (header, payload) = NonlinearQuantizationFileReader.Read(compressedData);
-        _header = header;
-
-        int  qbits      = Math.Max(1, header.QuantizationBits);
-        long sampleCount = header.SampleCount;
-        _levels    = 1 << qbits;
-        _lnMuPlus1 = Math.Log(1 + Mu);
-        _Decodedquantized  = new int[sampleCount];
-
-        if (qbits == 8)
-        {
-            for (int i = 0; i < sampleCount; i++)
-                _Decodedquantized[i] = payload[i];
-        }
-        else
-        {
-            int bitIndex = 0;
-            for (int i = 0; i < sampleCount; i++)
-            {
-                int bitsLeft = qbits, v = 0, shift = 0;
-                while (bitsLeft > 0)
-                {
-                    int bytePos = bitIndex / 8;
-                    int offset  = bitIndex % 8;
-                    int space   = 8 - offset;
-                    int take    = Math.Min(space, bitsLeft);
-                    int chunk   = (payload[bytePos] >> offset) & ((1 << take) - 1);
-                    v        |= (chunk << shift);
-                    shift    += take;
-                    bitsLeft -= take;
-                    bitIndex += take;
-                }
-                _Decodedquantized[i] = v;
-            }
-        }
-
-        return sampleCount;
-    }
-
-    protected override void DecodeSample(long index)
-    {
-        double y    = (double)_Decodedquantized[index] / (_levels - 1) * 2.0 - 1.0;
-        double sign = Math.Sign(y);
-        double absy = Math.Abs(y);
-        double expanded = absy > 0
-            ? sign * (Math.Exp(absy * _lnMuPlus1) - 1.0) / Mu
-            : 0.0;
-
-        int sval = (int)Math.Round(expanded * 32767.0);
-        DecompressedSamples[index] = (short)Math.Clamp(sval, short.MinValue, short.MaxValue);
-    }
-
-    protected override DecompressionResult BuildDecompressionResult()
-        => new(DecompressedSamples,
-            _header.SampleRate,
-            (short)_header.Channels,
-            (short)_header.BitsPerSample);
 }
