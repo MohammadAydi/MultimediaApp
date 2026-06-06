@@ -1,3 +1,4 @@
+using AudioCompressionApp.Algorithms.ADM.Filters;
 using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Models;
 
@@ -70,12 +71,35 @@ public class AdmDecodingAlgo : DecodingAlgoBase {
         AdaptStepSize(_encodedBits[(int)index]);
     }
 
-    protected override DecompressionResult BuildDecompressionResult()
-        => new(_header.SampleCount > 0 ? DecompressedSamples : [],
+    protected override DecompressionResult BuildDecompressionResult() {
+        
+        // ── SNR comparison across all low-pass filter variants ────────────────
+        // IAdmLowPassFilter[] filters = [
+        //     AdmLowPassFilters.None(),
+        //
+        //     AdmLowPassFilters.MovingAverage(radius: 2),
+        //     AdmLowPassFilters.MovingAverage(radius: 4),
+        //
+        //     AdmLowPassFilters.IirFirstOrder(alpha: 0.05),
+        //     AdmLowPassFilters.IirFirstOrder(alpha: 0.1),
+        //     AdmLowPassFilters.IirFirstOrder(alpha: 0.3),
+        //     AdmLowPassFilters.IirFirstOrderFromCutoff(3400, sampleRate),
+        //
+        //     AdmLowPassFilters.IirCascaded(alpha: 0.2, stages: 2),
+        //     AdmLowPassFilters.IirCascaded(alpha: 0.25, stages: 3),
+        //
+        //     AdmLowPassFilters.Butterworth(cutoffHz: 3000, sampleRate: sampleRate),
+        //     AdmLowPassFilters.Butterworth(cutoffHz: 4000, sampleRate: sampleRate),
+        //     AdmLowPassFilters.Butterworth(cutoffHz: 6000, sampleRate: sampleRate),
+        // ];
+        IAdmLowPassFilter filter = AdmLowPassFilters.IirCascaded(alpha: 0.25, stages: 3);
+        short[] filtered = filter.Apply(DecompressedSamples);
+        return new(_header.SampleCount > 0 ? filtered : [],
             _header.SampleRate,
             _header.Channels,
             _header.BitsPerSample);
 
+    } 
     private void AdaptStepSize(
         bool currentBit) {
         if (_previousBit == null) {
