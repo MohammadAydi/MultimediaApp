@@ -14,8 +14,12 @@ public interface ICompressionAlgorithm {
         IProgress<CompressionProgressModel> progress,
         CancellationToken cancellationToken);
 
-    DecompressionResult Decompress(
-        byte[] compressedData);
+    public DecompressionResult Decompress(byte[] compressedData);
+
+    public Task<DecompressionResult> DecompressAsync(
+        byte[] compressedData,
+        IProgress<CompressionProgressModel>? progress = null,
+        CancellationToken cancellationToken = default);
 }
 
 public static class CompressionAlgorithmFactory {

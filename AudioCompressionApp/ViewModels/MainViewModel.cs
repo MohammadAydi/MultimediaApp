@@ -129,6 +129,7 @@ public partial class MainViewModel : ObservableObject {
     [NotifyPropertyChangedFor(nameof(SourceChannels))]
     [NotifyPropertyChangedFor(nameof(SourceBitsPerSample))]
     [NotifyPropertyChangedFor(nameof(SourceFileSize))]
+    [NotifyPropertyChangedFor(nameof(SourcePlayDuration))]
     [NotifyCanExecuteChangedFor(nameof(CompressCommand))]
     [NotifyCanExecuteChangedFor(nameof(PlayCommand))]
     [NotifyCanExecuteChangedFor(nameof(PauseCommand))]
@@ -149,6 +150,23 @@ public partial class MainViewModel : ObservableObject {
         ? FormatFileSize(_audioFileService.GetFileSize(f.FilePath))
         : "—";
 
+    /// <summary>
+    /// Total playback duration of the loaded audio file.
+    /// Computed once on load from sample count ÷ (sample rate × channels).
+    /// </summary>
+    public string SourcePlayDuration => _currentAudioFile is { } f
+        ? FormatDuration(f.TotalSamples, f.SampleRate, f.Channels)
+        : "—";
+
+    private static string FormatDuration(long totalSamples, int sampleRate, int channels) {
+        if (sampleRate <= 0 || channels <= 0) return "—";
+        double seconds = (double)totalSamples / (sampleRate * channels);
+        var ts = TimeSpan.FromSeconds(seconds);
+        return ts.TotalHours >= 1
+            ? ts.ToString(@"h\:mm\:ss")
+            : ts.ToString(@"m\:ss");
+    }
+
     // =========================================================
     // COMPRESSED FILE INFO
     // =========================================================
@@ -157,6 +175,9 @@ public partial class MainViewModel : ObservableObject {
     [NotifyPropertyChangedFor(nameof(CompressedFileName))]
     [NotifyPropertyChangedFor(nameof(CompressedFileSize))]
     [NotifyPropertyChangedFor(nameof(CompressedAlgorithmName))]
+    [NotifyPropertyChangedFor(nameof(CompressedSampleRate))]
+    [NotifyPropertyChangedFor(nameof(CompressedChannels))]
+    [NotifyPropertyChangedFor(nameof(CompressedBitsPerSample))]
     [NotifyCanExecuteChangedFor(nameof(DecompressCommand))]
     [NotifyCanExecuteChangedFor(nameof(PlayDecompressedCommand))]
     [NotifyCanExecuteChangedFor(nameof(StopDecompressedCommand))]
@@ -170,6 +191,27 @@ public partial class MainViewModel : ObservableObject {
         : "—";
 
     public string CompressedAlgorithmName => _compressedFileInfo?.AlgorithmName ?? "—";
+
+    /// <summary>
+    /// Sample rate read from the compressed file header.
+    /// Populate CompressedFileModel.SampleRate in LoadCompressedFile().
+    /// </summary>
+    public string CompressedSampleRate =>
+        _compressedFileInfo is { SampleRate: > 0 } c ? $"{c.SampleRate} Hz" : "—";
+
+    /// <summary>
+    /// Channel count read from the compressed file header.
+    /// </summary>
+    public string CompressedChannels =>
+        _compressedFileInfo is { Channels: > 0 } c
+            ? c.Channels == 2 ? "Stereo" : $"{c.Channels}ch"
+            : "—";
+
+    /// <summary>
+    /// Bit depth read from the compressed file header.
+    /// </summary>
+    public string CompressedBitsPerSample =>
+        _compressedFileInfo is { BitsPerSample: > 0 } c ? $"{c.BitsPerSample}-bit" : "—";
 
     // =========================================================
     // STATE FLAGS — drive CanExecute + UI visibility
@@ -217,12 +259,21 @@ public partial class MainViewModel : ObservableObject {
     private bool _isSourcePaused;
 
     // =========================================================
-    // REAL-TIME PROGRESS
+    // REAL-TIME COMPRESSION PROGRESS
     // =========================================================
 
     [ObservableProperty] private double _operationProgress;
     [ObservableProperty] private string _processingSpeed = "—";
     [ObservableProperty] private string _liveCompressionRatio = "—";
+
+
+    // =========================================================
+    // REAL-TIME DECOMPRESSION PROGRESS
+    // =========================================================
+    [ObservableProperty] private double _decompressionProgress;
+    [ObservableProperty] private string _decompressionSpeed = "—";
+    [ObservableProperty] private string _finalDecompressionTime = "—";
+
 
     // =========================================================
     // FINAL RESULTS
@@ -296,6 +347,8 @@ public partial class MainViewModel : ObservableObject {
             SampleRate = reader.WaveFormat.SampleRate,
             Channels = reader.WaveFormat.Channels,
             BitsPerSample = reader.WaveFormat.BitsPerSample,
+            // TotalSamples drives the play duration display
+            TotalSamples = reader.SampleCount,
         };
 
         IsAudioLoaded = true;
@@ -312,6 +365,10 @@ public partial class MainViewModel : ObservableObject {
             FilePath = filePath,
             FileName = Path.GetFileName(filePath),
             AlgorithmName = SelectedAlgorithm.Name,
+            // TODO: read SampleRate, Channels, BitsPerSample from the file header
+            // e.g. SampleRate    = header.SampleRate,
+            //      Channels      = header.Channels,
+            //      BitsPerSample = header.BitsPerSample,
         };
 
         IsCompressedFileLoaded = true;
@@ -470,31 +527,54 @@ public partial class MainViewModel : ObservableObject {
     private async Task DecompressAsync() {
         if (CompressedFileInfo is null) return;
 
-        IsDecompressing = true;
-        OperationProgress = 0;
-        ProcessingSpeed = "—";
-        FinalDuration = "—";
+        IsDecompressing        = true;
+        DecompressionProgress  = 0;
+        DecompressionSpeed     = "—";
+        FinalDecompressionTime = "—";
+
         _cancellationTokenSource = new CancellationTokenSource();
 
+        var progressReporter = new Progress<CompressionProgressModel>(model =>
+        {
+            DecompressionProgress = model.Progress;
+            DecompressionSpeed    = $"{model.ProcessingSpeed:F0} samples/s";
+        });
+
         AddLog("Decompression started");
-        try {
+        try
+        {
             byte[] fileBytes = await _audioFileService.GetFileBytes(CompressedFileInfo.FilePath);
-            DecompressionResult result = SelectedAlgorithm.Decompress(fileBytes);
-            byte[] wav = WaveFileBuilder.CreateWaveFile(result);
+
+            DecompressionResult result = await SelectedAlgorithm.DecompressAsync(
+                fileBytes,
+                progressReporter,
+                _cancellationTokenSource.Token);
+
+            FinalDecompressionTime = $"{result.DecompressionTime.TotalMilliseconds:F0} ms";
+            DecompressionProgress  = 100;
+
+            byte[]  wav      = WaveFileBuilder.CreateWaveFile(result);
             string? filePath = SaveDecompressedFile();
             await _audioFileService.SaveBytesToFileAsync(filePath, wav);
-            AddLog("Decompression complete");
+
+            AddLog($"Decompression complete — {FinalDecompressionTime}");
         }
-        catch (OperationCanceledException) {
+        catch (OperationCanceledException)
+        {
+            DecompressionProgress  = 0;
+            DecompressionSpeed     = "—";
+            FinalDecompressionTime = "—";
             AddLog("Decompression cancelled");
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             AddLog($"Error: {ex.Message}");
             MessageBox.Show($"Decompression failed: {ex.Message}", "Error",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             Console.WriteLine($"[ERROR] {ex}");
         }
-        finally {
+        finally
+        {
             IsDecompressing = false;
         }
     }

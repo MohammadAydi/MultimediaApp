@@ -9,4 +9,5 @@ public class AudioFileModel {
     public int Channels { get; set; }
 
     public int BitsPerSample { get; set; }
+    public long TotalSamples { get; set; }
 }

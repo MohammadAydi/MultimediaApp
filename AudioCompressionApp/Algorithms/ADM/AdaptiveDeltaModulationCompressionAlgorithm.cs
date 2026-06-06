@@ -7,7 +7,7 @@ namespace AudioCompressionApp.Algorithms;
 
 public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmBase {
     private readonly List<bool> _encodedBits = [];
-    private double _reconstructed;
+    private double _reconstructed = 0;
 
     private double _stepSize;
     private bool? _previousBit;
@@ -16,6 +16,11 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
     private CompressionContext? _context;
 
+    private AdmHeader _header;
+    private List<bool> _bits = [];
+    public long BitsWritten { get; private set; }
+    private int _processedSamples;
+
 
     public override string Name => "Adaptive Delta Modulation";
     public override string Extension => "admAydi";
@@ -23,6 +28,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
     private readonly Dictionary<int, int> _diffHistogram = new();
 
     protected override void ProcessSample(int index, CompressionContext context) {
+        _processedSamples++;
         short sample = context.Samples[index];
         if (index > 0) {
             int previous = context.Samples[index - 1];
@@ -53,6 +59,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         _reconstructed += transmitted;
 
         _encodedBits.Add(bit);
+        BitsWritten++;
 
         // Console.WriteLine(
         //     $"[{index}] " +
@@ -63,21 +70,28 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         //     $"Transmit={transmitted}, " +
         //     $"UpdatedEstimate={_reconstructed}");
     }
-    
+
     private void AdaptStepSize(
-        bool currentBit)
-    {
-        if(_previousBit ==null) {
+        bool currentBit) {
+        if (_previousBit == null) {
             _previousBit = currentBit;
             return;
         }
-        
-        
+
+
         _previousBit = currentBit;
     }
 
     protected override double CalculateCurrentRatio() {
-        return 1.0;
+        if (BitsWritten == 0)
+            return 0;
+
+        long originalBits =
+            (long)_processedSamples *
+            _context!.Settings.BitsPerSample;
+
+        return (double)originalBits /
+               BitsWritten;
     }
 
     protected override void Initialize(CompressionContext context) {
@@ -165,4 +179,29 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
 
         return new DecompressionResult(samples, header.SampleRate, header.Channels, header.BitsPerSample);
     }
+
+    protected override long ParseInput(byte[] compressedData) {
+        var (header, payload) = AdmFileReader.Read(compressedData);
+        _header = header;
+        _bits = AdmBitPacker.UnpackBits(payload, header.SampleCount);
+        return header.SampleCount;
+    }
+
+    protected override void DecodeSample(long index) {
+        if (_bits[(int)index])
+            _reconstructed += _header.InitialStepSize;
+        else
+            _reconstructed -= _header.InitialStepSize;
+
+        DecompressedSamples[index] = (short)Math.Clamp(
+            _reconstructed,
+            short.MinValue,
+            short.MaxValue);
+    }
+
+    protected override DecompressionResult BuildDecompressionResult()
+        => new(_header.SampleCount > 0 ? DecompressedSamples : [],
+            _header.SampleRate,
+            _header.Channels,
+            _header.BitsPerSample);
 }
