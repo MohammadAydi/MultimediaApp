@@ -110,12 +110,14 @@ public partial class MainViewModel : ObservableObject {
     [NotifyPropertyChangedFor(nameof(AlgorithmSettingsViewModel))]
     private ICompressionAlgorithm? _selectedAlgorithm;
 
-    [ObservableProperty] private double quantizationLevels = 16;
+    [ObservableProperty] private int _nlqQuantizationBits = 8;
+    [ObservableProperty] private int _dpcmQuantizationStep = 8;
+    [ObservableProperty] private int _dpcmPredictorOrder = 1;
 
     /// <summary>
     /// Returns a ViewModel that exposes the editable settings for
     /// the currently selected algorithm.
-    /// PLACEHOLDER — implement by returning a typed settings VM.
+    /// Returns null if no algorithm is selected.
     /// </summary>
     public AlgorithmSettingsViewModel? AlgorithmSettingsViewModel =>
         SelectedAlgorithm is null ? null : CreateSettingsViewModel(SelectedAlgorithm);
@@ -460,6 +462,7 @@ public partial class MainViewModel : ObservableObject {
             short[] samples = await _audioFileService.GetAudioSamples(CurrentAudioFile.FilePath);
             var context = new CompressionContext {
                 Samples = samples,
+                BitsPerSample = CurrentAudioFile.BitsPerSample,
                 Settings = CreateSettingsForAlgorithm(SelectedAlgorithm),
             };
             CompressionResult result = await SelectedAlgorithm.CompressAsync(
@@ -470,7 +473,7 @@ public partial class MainViewModel : ObservableObject {
             FinalCompressionRatio = $"{result.CompressionRatio:F2}:1";
             FinalDuration = $"{result.CompressionTime.TotalMilliseconds:F0} ms";
 
-            long originalBytes = samples.Length * sizeof(short);
+            long originalBytes = (long)samples.Length * (CurrentAudioFile.BitsPerSample / 8);
             long compressedBytes = result.CompressedData.Length;
             double saved = (1.0 - (double)compressedBytes / originalBytes) * 100.0;
             SpaceSaved = $"{saved:F1}%";
@@ -641,10 +644,15 @@ public partial class MainViewModel : ObservableObject {
         _ => $"{bytes / (1024.0 * 1024.0):F2} MB",
     };
 
-    private static AlgorithmSettingsViewModel? CreateSettingsViewModel(
+    private AlgorithmSettingsViewModel? CreateSettingsViewModel(
         ICompressionAlgorithm algorithm) {
-        // TODO: return a strongly-typed settings VM per algorithm
-        return new AlgorithmSettingsViewModel(algorithm.Name);
+        return algorithm switch {
+            NonlinearQuantizationCompressionAlgorithm => new NlqSettingsViewModel(this),
+            DpcmCompressionAlgorithm => new DpcmSettingsViewModel(this),
+            AdaptiveDeltaModulationCompressionAlgorithm => new NoSettingsViewModel(),
+            DeltaModulationCompressionAlgorithm => new NoSettingsViewModel(),
+            _ => null,
+        };
     }
 
     private CompressionSettings CreateSettingsForAlgorithm(ICompressionAlgorithm algorithm) {
@@ -656,7 +664,8 @@ public partial class MainViewModel : ObservableObject {
                 SampleRate = CurrentAudioFile.SampleRate,
                 Channels = CurrentAudioFile.Channels,
                 BitsPerSample = CurrentAudioFile.BitsPerSample,
-                QuantizationStep = 8,
+                QuantizationStep = DpcmQuantizationStep,
+                PredictorOrder = DpcmPredictorOrder,
             },
             AdaptiveDeltaModulationCompressionAlgorithm =>
                 new AdaptiveDeltaModulationSettings {
@@ -675,7 +684,7 @@ public partial class MainViewModel : ObservableObject {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
-                    QuantizationBits = (int)QuantizationLevels,
+                    QuantizationBits = NlqQuantizationBits,
                 },
             _ => throw new NotSupportedException(
                 $"Algorithm {algorithm.GetType().Name} is not supported"),
@@ -684,16 +693,85 @@ public partial class MainViewModel : ObservableObject {
 }
 
 // ─────────────────────────────────────────────────────────────
-// PLACEHOLDER VIEW-MODELS for algorithm settings
+// ALGORITHM SETTINGS VIEW-MODELS
 // ─────────────────────────────────────────────────────────────
 
-public partial class AlgorithmSettingsViewModel : ObservableObject {
-    public AlgorithmSettingsViewModel(string algorithmName) {
-        AlgorithmName = algorithmName;
+/// <summary>
+/// Abstract base class for algorithm-specific settings ViewModels.
+/// Each algorithm has its own concrete implementation.
+/// </summary>
+public abstract partial class AlgorithmSettingsViewModel : ObservableObject {
+}
+
+/// <summary>
+/// Settings ViewModel for Nonlinear Quantization algorithm.
+/// Exposes: QuantizationBits (range 1..16)
+/// </summary>
+public partial class NlqSettingsViewModel : AlgorithmSettingsViewModel {
+    private readonly MainViewModel _mainVm;
+
+    public NlqSettingsViewModel(MainViewModel mainVm) {
+        _mainVm = mainVm;
     }
 
-    public string AlgorithmName { get; }
+    /// <summary>
+    /// QuantizationBits for Nonlinear — range 1..16.
+    /// Bound to slider in XAML; delegates to MainViewModel property.
+    /// </summary>
+    public int NlqQuantizationBits {
+        get => _mainVm.NlqQuantizationBits;
+        set {
+            if (_mainVm.NlqQuantizationBits != value) {
+                _mainVm.NlqQuantizationBits = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+}
 
-    [ObservableProperty] private double _setting1 = 8;
-    [ObservableProperty] private double _setting2 = 100;
+/// <summary>
+/// Settings ViewModel for DPCM algorithm.
+/// Exposes: QuantizationStep (range 1..64) and PredictorOrder (range 1..2)
+/// </summary>
+public partial class DpcmSettingsViewModel : AlgorithmSettingsViewModel {
+    private readonly MainViewModel _mainVm;
+
+    public DpcmSettingsViewModel(MainViewModel mainVm) {
+        _mainVm = mainVm;
+    }
+
+    /// <summary>
+    /// QuantizationStep for DPCM — range 1..64.
+    /// Delegates to MainViewModel property.
+    /// </summary>
+    public int DpcmQuantizationStep {
+        get => _mainVm.DpcmQuantizationStep;
+        set {
+            if (_mainVm.DpcmQuantizationStep != value) {
+                _mainVm.DpcmQuantizationStep = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    /// <summary>
+    /// PredictorOrder for DPCM — range 1..2.
+    /// Delegates to MainViewModel property.
+    /// </summary>
+    public int DpcmPredictorOrder {
+        get => _mainVm.DpcmPredictorOrder;
+        set {
+            if (_mainVm.DpcmPredictorOrder != value) {
+                _mainVm.DpcmPredictorOrder = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+}
+
+/// <summary>
+/// Settings ViewModel for algorithms with no user-configurable settings.
+/// Used for Adaptive Delta Modulation and Delta Modulation.
+/// </summary>
+public partial class NoSettingsViewModel : AlgorithmSettingsViewModel {
 }
