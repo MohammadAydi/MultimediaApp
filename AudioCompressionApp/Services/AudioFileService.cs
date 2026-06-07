@@ -61,13 +61,35 @@ public class AudioFileService {
     public async Task<short[]> GetAudioSamples(string filePath) {
         short[] samples;
         await using (var waveReader = new WaveFileReader(filePath)) {
+            int bitsPerSample = waveReader.WaveFormat.BitsPerSample;
             var totalBytes = (int)waveReader.Length;
             var buffer = new byte[totalBytes];
             await waveReader.ReadExactlyAsync(buffer, 0, totalBytes);
 
-            samples = new short[totalBytes / 2];
-            for (var i = 0; i < samples.Length; i++)
-                samples[i] = (short)(buffer[i * 2] | (buffer[i * 2 + 1] << 8));
+            int bytesPerSample = bitsPerSample / 8;
+            int sampleCount = totalBytes / bytesPerSample;
+            samples = new short[sampleCount];
+
+            if (bitsPerSample == 16) {
+                for (int i = 0; i < sampleCount; i++)
+                    samples[i] = (short)(buffer[i * 2] | (buffer[i * 2 + 1] << 8));
+            }
+            else if (bitsPerSample == 32) {
+                for (int i = 0; i < sampleCount; i++) {
+                    int raw = buffer[i * 4]
+                            | (buffer[i * 4 + 1] << 8)
+                            | (buffer[i * 4 + 2] << 16)
+                            | (buffer[i * 4 + 3] << 24);
+                    // Scale 32-bit → 16-bit range for storage in short[]
+                    // Preserves full dynamic range; BitsPerSample in context
+                    // will be used by Nonlinear to normalize correctly.
+                    samples[i] = (short)(raw >> 16);
+                }
+            }
+            else {
+                throw new NotSupportedException(
+                    $"Unsupported bit depth: {bitsPerSample}. Only 16-bit and 32-bit PCM are supported.");
+            }
         }
 
         Console.WriteLine($"\n[Compress] Loaded {samples.Length:N0} samples — {filePath}");
