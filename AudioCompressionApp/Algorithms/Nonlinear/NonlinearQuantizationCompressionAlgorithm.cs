@@ -117,7 +117,9 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
     protected override double CalculateCurrentRatio() {
         if (_context is null || _settings is null) return 0.0;
 
-        long originalBits = (long)_context.Samples.Length * 16;
+        // Use actual source bit depth for ratio calculation
+        int srcBits = _context.BitsPerSample;
+        long originalBits = (long)_context.Samples.Length * srcBits;
         long compressedBits = (long)_context.Samples.Length * Math.Max(1, _settings.QuantizationBits);
         if (compressedBits == 0) return 0.0;
         return (double)originalBits / compressedBits;

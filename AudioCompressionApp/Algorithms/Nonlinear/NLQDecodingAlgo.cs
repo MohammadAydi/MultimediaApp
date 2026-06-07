@@ -82,7 +82,7 @@ public class NLQDecodingAlgo : DecodingAlgoBase {
 
         if (qbits == 8) {
             for (int i = 0; i < sampleCount; i++)
-                _quantized[i] = payload[i];
+                _quantized.Add(payload[i]);
         }
         else {
             int bitIndex = 0;
@@ -100,7 +100,7 @@ public class NLQDecodingAlgo : DecodingAlgoBase {
                     bitIndex += take;
                 }
 
-                _quantized[i] = v;
+                _quantized.Add(v);
             }
         }
 
