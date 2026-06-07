@@ -80,9 +80,6 @@ public class AudioFileService {
                             | (buffer[i * 4 + 1] << 8)
                             | (buffer[i * 4 + 2] << 16)
                             | (buffer[i * 4 + 3] << 24);
-                    // Scale 32-bit → 16-bit range for storage in short[]
-                    // Preserves full dynamic range; BitsPerSample in context
-                    // will be used by Nonlinear to normalize correctly.
                     samples[i] = (short)(raw >> 16);
                 }
             }
