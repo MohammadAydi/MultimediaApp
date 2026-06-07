@@ -85,7 +85,7 @@ public class AudioFileService {
             }
             else {
                 throw new NotSupportedException(
-                    $"Unsupported bit depth: {bitsPerSample}. Only 16-bit and 32-bit PCM are supported, try again.");
+                    $"Unsupported bit depth: {bitsPerSample}. Only 16-bit and 32-bit PCM are supported.");
             }
         }
 
