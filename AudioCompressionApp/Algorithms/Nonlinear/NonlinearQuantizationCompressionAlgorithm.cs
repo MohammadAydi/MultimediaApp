@@ -44,7 +44,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
         short sample = context.Samples[index];
 
         // Normalize to [-1, +1]
-        double normalized = sample / 32768.0; // maps -32768 -> -1.0, +32767 -> ~0.99997
+        double normalized = sample / 32768.0;
 
         // μ-law compression
         double sign = Math.Sign(normalized);
@@ -69,7 +69,6 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
             return;
 
         int qbits = Math.Max(1, _settings.QuantizationBits);
-        int levels = 1 << qbits;
 
         // Pack quantized values into bytes (bit packing)
         byte[] payload;
