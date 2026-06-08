@@ -125,7 +125,6 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
                 InitialStepSize = _settings.InitialStepSize,
                 InitialPredictor = _context.Samples[0],
                 StepIncreaseFactor = _settings.StepIncreaseFactor,
-                StepDecreaseFactor = _settings.StepDecreaseFactor,
                 
             };
 

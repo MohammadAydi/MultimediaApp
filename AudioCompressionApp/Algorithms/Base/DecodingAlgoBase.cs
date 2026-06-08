@@ -31,7 +31,7 @@ public abstract class DecodingAlgoBase : IDecodingAlgo{
                 }
             }
 
-            // Final progress update
+            
             ReportDecompressionProgress(totalSamples, totalSamples, stopwatch, progress);
 
             stopwatch.Stop();
@@ -40,7 +40,7 @@ public abstract class DecodingAlgoBase : IDecodingAlgo{
                 return BuildDecompressionResult() with { DecompressionTime = stopwatch.Elapsed };
             }
             finally {
-                CleanupDecompression(); // new virtual no-op hook
+                CleanupDecompression(); 
             }
         }, cancellationToken);
     }
@@ -61,7 +61,7 @@ public abstract class DecodingAlgoBase : IDecodingAlgo{
         progress?.Report(new CompressionProgressModel {
             Progress = percentage,
             ProcessingSpeed = speed,
-            CompressionRatio = 0 // not meaningful during decompression; callers can ignore
+            CompressionRatio = 0 
         });
     }
 

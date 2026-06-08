@@ -8,7 +8,7 @@
 
             <ResourceDictionary.MergedDictionaries>
 
-                <!-- 1. Color tokens (must come first — Controls.xaml references them) -->
+                <!-- 1. Color tokens -->
                 <ResourceDictionary Source="Themes/Colors.xaml" />
 
                 <!-- 2. Control styles -->
@@ -18,8 +18,6 @@
 
             <!--
                 Application-level converter singletons.
-                Windows/UserControls can also declare them locally, but
-                putting them here means they're available everywhere.
             -->
             <conv:BoolToVisibilityConverter  x:Key="AppBoolToVisibility" />
             <conv:NullToVisibilityConverter  x:Key="AppNullToVisibility" />

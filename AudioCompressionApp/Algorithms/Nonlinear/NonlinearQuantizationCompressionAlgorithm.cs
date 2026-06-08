@@ -70,7 +70,7 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
 
         int qbits = Math.Max(1, _settings.QuantizationBits);
 
-        // Pack quantized values into bytes (bit packing)
+        // Pack quantized values into bytes
         byte[] payload;
         if (qbits == 8) {
             payload = _quantized.Select(i => (byte)i).ToArray();
@@ -116,7 +116,6 @@ public sealed class NonlinearQuantizationCompressionAlgorithm : CompressionAlgor
     protected override double CalculateCurrentRatio() {
         if (_context is null || _settings is null) return 0.0;
 
-        // Use actual source bit depth for ratio calculation
         int srcBits = _context.BitsPerSample;
         long originalBits = (long)_context.Samples.Length * srcBits;
         long compressedBits = (long)_context.Samples.Length * Math.Max(1, _settings.QuantizationBits);

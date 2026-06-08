@@ -16,23 +16,6 @@ using NAudio.Wave;
 
 namespace AudioCompressionApp.ViewModels;
 
-/// <summary>
-/// Main ViewModel for the Audio Compression application.
-///
-/// UI → ViewModel binding map:
-///   - File explorer tree  → FileSystemTree (FileSystemTreeViewModel)
-///   - Mode (read-only)    → IsCompressMode / IsDecompressMode
-///                           Set automatically by file extension — never by the user.
-///   - Playback            → PlayCommand / PauseCommand / StopCommand
-///   - Compression         → CompressCommand / CancelCompressionCommand
-///   - Decompression       → DecompressCommand / CancelDecompressionCommand
-///   - Reset               → ResetCommand
-///   - Algorithm selection → SelectedAlgorithm (drives AlgorithmSettingsViewModel)
-///   - Progress feedback   → OperationProgress / ProcessingSpeed / LiveCompressionRatio
-///   - Final results       → FinalCompressionRatio / FinalDuration / SnrDb / SpaceSaved
-///   - File info           → SourceFile* / CompressedFile*
-///   - Activity log        → Logs
-/// </summary>
 public partial class MainViewModel : ObservableObject {
     // ── Dependencies ──────────────────────────────────────────────────────────
     private readonly AudioFileService _audioFileService;
@@ -59,8 +42,7 @@ public partial class MainViewModel : ObservableObject {
             new NonlinearQuantizationCompressionAlgorithm(),
         ];
 
-        // Wire the tree's file-selection callback to our routing method.
-        // The tree knows nothing about audio — it just reports a file path.
+ 
         FileSystemTree = new FileSystemTreeViewModel {
             FileSelected = RouteSelectedFile,
         };
@@ -70,29 +52,19 @@ public partial class MainViewModel : ObservableObject {
     // FILE SYSTEM TREE
     // =========================================================
 
-    /// <summary>
-    /// Drives the left-panel explorer TreeView.
-    /// Bound directly to the View — the tree's open-folder button,
-    /// root nodes, and selection all live here.
-    /// </summary>
+
     public FileSystemTreeViewModel FileSystemTree { get; }
 
     // =========================================================
     // MODE  (read-only — set by extension, never by user)
     // =========================================================
-
-    /// <summary>
-    /// True when a raw audio file (.wav / .mp3) is selected.
-    /// Set automatically when the user picks a file in the tree.
-    /// The UI displays this as a read-only badge — no click handler.
-    /// </summary>
+    
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsDecompressMode))]
     [NotifyCanExecuteChangedFor(nameof(CompressCommand))]
     [NotifyCanExecuteChangedFor(nameof(DecompressCommand))]
     private bool _isCompressMode = true;
 
-    /// <summary>True when the selected file is a compressed audio file.</summary>
     public bool IsDecompressMode => !IsCompressMode;
 
     // =========================================================
@@ -115,11 +87,6 @@ public partial class MainViewModel : ObservableObject {
     [ObservableProperty] private double _admStepDecreaseFactor = 0.9;
     [ObservableProperty] private double _dmInitialStepSize = 100;
 
-    /// <summary>
-    /// Returns a ViewModel that exposes the editable settings for
-    /// the currently selected algorithm.
-    /// Returns null if no algorithm is selected.
-    /// </summary>
     public AlgorithmSettingsViewModel? AlgorithmSettingsViewModel =>
         SelectedAlgorithm is null ? null : CreateSettingsViewModel(SelectedAlgorithm);
 
@@ -154,10 +121,7 @@ public partial class MainViewModel : ObservableObject {
         ? FormatFileSize(_audioFileService.GetFileSize(f.FilePath))
         : "—";
 
-    /// <summary>
-    /// Total playback duration of the loaded audio file.
-    /// Computed once on load from sample count ÷ (sample rate × channels).
-    /// </summary>
+
     public string SourcePlayDuration => _currentAudioFile is { } f
         ? FormatDuration(f.TotalSamples, f.SampleRate, f.Channels)
         : "—";
@@ -196,24 +160,16 @@ public partial class MainViewModel : ObservableObject {
 
     public string CompressedAlgorithmName => _compressedFileInfo?.AlgorithmName ?? "—";
 
-    /// <summary>
-    /// Sample rate read from the compressed file header.
-    /// Populate CompressedFileModel.SampleRate in LoadCompressedFile().
-    /// </summary>
     public string CompressedSampleRate =>
         _compressedFileInfo is { SampleRate: > 0 } c ? $"{c.SampleRate} Hz" : "—";
 
-    /// <summary>
-    /// Channel count read from the compressed file header.
-    /// </summary>
+
     public string CompressedChannels =>
         _compressedFileInfo is { Channels: > 0 } c
             ? c.Channels == 2 ? "Stereo" : $"{c.Channels}ch"
             : "—";
 
-    /// <summary>
-    /// Bit depth read from the compressed file header.
-    /// </summary>
+
     public string CompressedBitsPerSample =>
         _compressedFileInfo is { BitsPerSample: > 0 } c ? $"{c.BitsPerSample}-bit" : "—";
 
@@ -304,19 +260,7 @@ public partial class MainViewModel : ObservableObject {
     private void AddLog(string message) =>
         Logs.Insert(0, $"[{DateTime.Now:HH:mm:ss}] {message}");
 
-    // =========================================================
-    // FILE ROUTING  (replaces the old manual Open* commands)
-    //
-    // This is the single entry point for all file selection:
-    // tree clicks, drag-drop onto the tree, and drop onto the main area.
-    // The extension determines the mode — the user has no control over it.
-    // =========================================================
 
-    /// <summary>
-    /// Routes a file path to the correct loader based on its extension.
-    /// Called from FileSystemTreeViewModel.FileSelected and from the
-    /// drag-drop handler in MainWindow.xaml.cs.
-    /// </summary>
     public void RouteSelectedFile(string filePath) {
         string ext = Path.GetExtension(filePath).ToLowerInvariant();
 
@@ -335,10 +279,7 @@ public partial class MainViewModel : ObservableObject {
         }
     }
 
-    /// <summary>
-    /// Loads and validates a raw audio file from a file path.
-    /// Supports both WAV and MP3 formats.
-    /// </summary>
+
     public void LoadAudioFile(string filePath) {
         if (!_audioFileService.IsSupportedAudioFile(filePath)) {
             AddLog($"Unsupported audio file: {Path.GetFileName(filePath)}");
@@ -399,9 +340,7 @@ public partial class MainViewModel : ObservableObject {
         AddLog($"Loaded: {CurrentAudioFile.FileName}");
     }
 
-    /// <summary>
-    /// Loads a compressed audio file.
-    /// </summary>
+
     public async Task LoadCompressedFile(string filePath) {
         byte[] fileBytes = await _audioFileService.GetFileBytes(filePath);
         string magic = await _audioFileService.GetMagicName(filePath);
@@ -438,8 +377,6 @@ public partial class MainViewModel : ObservableObject {
     // =========================================================
     // COMMANDS — PLAYBACK  (source audio)
     // =========================================================
-
-    // And Play() — resume if paused, start fresh otherwise
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() {
         if (CurrentAudioFile == null || string.IsNullOrWhiteSpace(CurrentAudioFile.FilePath))
@@ -457,7 +394,6 @@ public partial class MainViewModel : ObservableObject {
         AddLog("Playback started");
     }
 
-// CanPlay must also allow resuming from pause
     private bool CanPlay() => IsAudioLoaded && (!IsPlayingSource || IsSourcePaused);
 
     [RelayCommand(CanExecute = nameof(CanPause))]
@@ -765,18 +701,9 @@ public partial class MainViewModel : ObservableObject {
 // ─────────────────────────────────────────────────────────────
 // ALGORITHM SETTINGS VIEW-MODELS
 // ─────────────────────────────────────────────────────────────
-
-/// <summary>
-/// Abstract base class for algorithm-specific settings ViewModels.
-/// Each algorithm has its own concrete implementation.
-/// </summary>
 public abstract partial class AlgorithmSettingsViewModel : ObservableObject {
 }
 
-/// <summary>
-/// Settings ViewModel for Nonlinear Quantization algorithm.
-/// Exposes: QuantizationBits (range 1..16)
-/// </summary>
 public partial class NlqSettingsViewModel : AlgorithmSettingsViewModel {
     private readonly MainViewModel _mainVm;
 
@@ -784,10 +711,6 @@ public partial class NlqSettingsViewModel : AlgorithmSettingsViewModel {
         _mainVm = mainVm;
     }
 
-    /// <summary>
-    /// QuantizationBits for Nonlinear — range 1..16.
-    /// Bound to slider in XAML; delegates to MainViewModel property.
-    /// </summary>
     public int NlqQuantizationBits {
         get => _mainVm.NlqQuantizationBits;
         set {
@@ -799,10 +722,7 @@ public partial class NlqSettingsViewModel : AlgorithmSettingsViewModel {
     }
 }
 
-/// <summary>
-/// Settings ViewModel for DPCM algorithm.
-/// Exposes: QuantizationStep (range 1..64) and PredictorOrder (range 1..2)
-/// </summary>
+
 public partial class DpcmSettingsViewModel : AlgorithmSettingsViewModel {
     private readonly MainViewModel _mainVm;
 
@@ -810,10 +730,7 @@ public partial class DpcmSettingsViewModel : AlgorithmSettingsViewModel {
         _mainVm = mainVm;
     }
 
-    /// <summary>
-    /// QuantizationStep for DPCM — range 1..64.
-    /// Delegates to MainViewModel property.
-    /// </summary>
+
     public int DpcmQuantizationStep {
         get => _mainVm.DpcmQuantizationStep;
         set {
@@ -824,10 +741,7 @@ public partial class DpcmSettingsViewModel : AlgorithmSettingsViewModel {
         }
     }
 
-    /// <summary>
-    /// PredictorOrder for DPCM — range 1..2.
-    /// Delegates to MainViewModel property.
-    /// </summary>
+
     public int DpcmPredictorOrder {
         get => _mainVm.DpcmPredictorOrder;
         set {
@@ -889,9 +803,6 @@ public partial class DmSettingsViewModel : AlgorithmSettingsViewModel {
     }
 }
 
-/// <summary>
-/// Settings ViewModel for algorithms with no user-configurable settings.
-/// Used for Adaptive Delta Modulation and Delta Modulation.
-/// </summary>
+
 public partial class NoSettingsViewModel : AlgorithmSettingsViewModel {
 }

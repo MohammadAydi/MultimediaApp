@@ -39,7 +39,7 @@ public class DmDecodingAlgo : DecodingAlgoBase {
 
     protected override DecompressionResult BuildDecompressionResult() {
         
-        // ── SNR comparison across all low-pass filter variants ────────────────
+        // ── SNR comparison ────────────────
         // IAdmLowPassFilter[] filters = [
         //     AdmLowPassFilters.None(),
         //
