@@ -12,7 +12,7 @@ public class DmDecodingAlgo : DecodingAlgoBase {
     private List<bool> _encodedBits = [];
     private double _stepSize;
 
-    public override string Name => "Adaptive Delta Modulation";
+    public override string Name => "Delta Modulation";
 
    
 
