@@ -59,22 +59,40 @@ public class AudioFileService {
     }
 
     public async Task<short[]> GetAudioSamples(string filePath) {
-        short[] samples;
-        await using (var waveReader = new WaveFileReader(filePath)) {
-            int bitsPerSample = waveReader.WaveFormat.BitsPerSample;
-            var totalBytes = (int)waveReader.Length;
-            var buffer = new byte[totalBytes];
-            await waveReader.ReadExactlyAsync(buffer, 0, totalBytes);
+    short[] samples;
+    await using (var waveReader = new WaveFileReader(filePath)) {
+        int bitsPerSample = waveReader.WaveFormat.BitsPerSample;
+        var totalBytes = (int)waveReader.Length;
+        var buffer = new byte[totalBytes];
+        await waveReader.ReadExactlyAsync(buffer, 0, totalBytes);
 
-            int bytesPerSample = bitsPerSample / 8;
-            int sampleCount = totalBytes / bytesPerSample;
-            samples = new short[sampleCount];
+        int bytesPerSample = bitsPerSample / 8;
+        int sampleCount = totalBytes / bytesPerSample;
+        samples = new short[sampleCount];
 
-            if (bitsPerSample == 16) {
+        switch (bitsPerSample) {
+            case 8:
+                for (int i = 0; i < sampleCount; i++)
+                    samples[i] = (short)((buffer[i] - 128) << 8);
+                break;
+
+            case 16:
                 for (int i = 0; i < sampleCount; i++)
                     samples[i] = (short)(buffer[i * 2] | (buffer[i * 2 + 1] << 8));
-            }
-            else if (bitsPerSample == 32) {
+                break;
+
+            case 24:
+                for (int i = 0; i < sampleCount; i++) {
+                    int raw = buffer[i * 3]
+                            | (buffer[i * 3 + 1] << 8)
+                            | (buffer[i * 3 + 2] << 16);
+                    if ((raw & 0x800000) != 0)
+                        raw |= unchecked((int)0xFF000000);
+                    samples[i] = (short)(raw >> 8);
+                }
+                break;
+
+            case 32:
                 for (int i = 0; i < sampleCount; i++) {
                     int raw = buffer[i * 4]
                             | (buffer[i * 4 + 1] << 8)
@@ -82,16 +100,17 @@ public class AudioFileService {
                             | (buffer[i * 4 + 3] << 24);
                     samples[i] = (short)(raw >> 16);
                 }
-            }
-            else {
-                throw new NotSupportedException(
-                    $"Unsupported bit depth: {bitsPerSample}. Only 16-bit and 32-bit PCM are supported.");
-            }
-        }
+                break;
 
-        Console.WriteLine($"\n[Compress] Loaded {samples.Length:N0} samples — {filePath}");
-        return samples;
+            default:
+                throw new NotSupportedException(
+                    $"Unsupported bit depth: {bitsPerSample}. Supported: 8, 16, 24, 32-bit PCM.");
+        }
     }
+
+    Console.WriteLine($"\n[Compress] Loaded {samples.Length:N0} samples — {filePath}");
+    return samples;
+}
 
     public async Task<byte[]> GetFileBytes(string filePath) {
         byte[] compressedBytes =

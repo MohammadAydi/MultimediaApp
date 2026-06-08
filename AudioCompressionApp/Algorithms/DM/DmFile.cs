@@ -1,25 +1,21 @@
 using System.IO;
+using AudioCompressionApp.Algorithms.DM;
 
-namespace AudioCompressionApp.Algorithms.ADM;
-
-public static class AdmFileWriter {
+public static class DmFileWriter {
     public static byte[] Write(
-        AdmHeader header,
+        DmHeader header,
         byte[] payload) {
         using MemoryStream ms = new();
         using BinaryWriter writer = new(ms);
 
 
-        writer.Write(AdmHeader.MagicNumber);
+        writer.Write(DmHeader.MagicNumber);
         writer.Write(header.SampleRate);
         writer.Write(header.Channels);
         writer.Write(header.BitsPerSample);
         writer.Write(header.SampleCount);
         writer.Write(header.InitialStepSize);
         writer.Write(header.InitialPredictor);
-        writer.Write(header.StepIncreaseFactor);
-        writer.Write(header.StepDecreaseFactor);
-        writer.Write(header.ConstFactor);
         writer.Write(payload.Length);
         writer.Write(payload);
 
@@ -27,9 +23,9 @@ public static class AdmFileWriter {
     }
 }
 
-public static class AdmFileReader {
+public static class DmFileReader {
     public static (
-        AdmHeader Header,
+        DmHeader Header,
         byte[] Payload)
         Read(byte[] fileData) {
         using MemoryStream ms =
@@ -39,20 +35,17 @@ public static class AdmFileReader {
             new(ms);
 
         byte[] magicNumber = reader.ReadBytes(4);
-        if (!magicNumber.AsSpan().SequenceEqual(AdmHeader.MagicNumber)) {
+        if (!magicNumber.AsSpan().SequenceEqual(DmHeader.MagicNumber)) {
             throw new InvalidDataException("Invalid ADM file.");
         }
 
-        AdmHeader header = new() {
+        DmHeader header = new() {
             SampleRate = reader.ReadInt32(),
             Channels = reader.ReadInt32(),
             BitsPerSample = reader.ReadInt32(),
             SampleCount = reader.ReadInt32(),
             InitialStepSize = reader.ReadDouble(),
             InitialPredictor = reader.ReadInt16(),
-            StepIncreaseFactor = reader.ReadDouble(),
-            StepDecreaseFactor = reader.ReadDouble(),
-            ConstFactor = reader.ReadDouble(),
         };
 
         Console.WriteLine("=== ADM Header ===");
@@ -62,9 +55,6 @@ public static class AdmFileReader {
         Console.WriteLine($"SampleCount        : {header.SampleCount}");
         Console.WriteLine($"InitialStepSize    : {header.InitialStepSize}");
         Console.WriteLine($"InitialPredictor   : {header.InitialPredictor}");
-        Console.WriteLine($"StepIncreaseFactor : {header.StepIncreaseFactor}");
-        Console.WriteLine($"StepDecreaseFactor : {header.StepDecreaseFactor}");
-        Console.WriteLine($"ConstFactor        : {header.ConstFactor}");
         Console.WriteLine("==================");
 
         int payloadLength =

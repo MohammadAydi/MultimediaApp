@@ -1,4 +1,4 @@
-namespace AudioCompressionApp.Algorithms.ADM.Filters;
+namespace AudioCompressionApp.Algorithms.Common.LowPassFilters;
 
 /// <summary>
 /// Common interface for every ADM low-pass post-filter.

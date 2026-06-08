@@ -1,4 +1,4 @@
-namespace AudioCompressionApp.Algorithms.ADM.Filters;
+namespace AudioCompressionApp.Algorithms.Common.LowPassFilters;
 
 /// <summary>
 /// Version 4 – Second-Order Butterworth Low-Pass Biquad Filter.

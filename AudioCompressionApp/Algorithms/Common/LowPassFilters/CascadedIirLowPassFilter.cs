@@ -1,4 +1,4 @@
-namespace AudioCompressionApp.Algorithms.ADM.Filters;
+namespace AudioCompressionApp.Algorithms.Common.LowPassFilters;
 
 /// <summary>
 /// Version 3b – Cascaded (Multi-Stage) First-Order IIR Low-Pass Filter.

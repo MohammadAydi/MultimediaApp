@@ -13,72 +13,7 @@ public class DPCMDecodingAlgo : DecodingAlgoBase{
 
 
     public override string Name => "DPCM";
-
-    public override DecompressionResult Decompress(byte[] compressedData) {
-        using var inputStream = new MemoryStream(compressedData);
-        using var binaryReader = new BinaryReader(inputStream);
-
-        var header = DpcmHeader.Read(binaryReader);
-        int quantStep = header.QuantizationStep;
-        int riceK = header.RiceParameter;
-        int channels = header.Channels;
-        long totalSamples = header.TotalSampleFrames;
-        int order = header.PredictorOrder;
-
-        short[] samples = new short[totalSamples];
-        var prev = new int[channels];
-        var prevPrev = new int[channels];
-        long processed;
-
-        if (order == 2) {
-            for (int ch = 0; ch < channels; ch++) {
-                short s0 = binaryReader.ReadInt16();
-                short s1 = binaryReader.ReadInt16();
-                samples[ch] = s0;
-                samples[ch + channels] = s1;
-                prevPrev[ch] = s0;
-                prev[ch] = s1;
-            }
-
-            processed = channels * 2;
-        }
-        else {
-            for (int ch = 0; ch < channels; ch++) {
-                short seed = binaryReader.ReadInt16();
-                samples[ch] = seed;
-                prev[ch] = seed;
-            }
-
-            processed = channels;
-        }
-
-        var bitReader = new BitPackReader(binaryReader);
-
-        while (processed < totalSamples) {
-            int channel = (int)(processed % channels);
-
-            int predicted = order == 2
-                ? Math.Clamp(2 * prev[channel] - prevPrev[channel], short.MinValue, short.MaxValue)
-                : prev[channel];
-
-            int quantisedDelta = RiceCoder.Decode(bitReader, riceK);
-
-            int reconstructed = Math.Clamp(
-                predicted + quantisedDelta * quantStep,
-                short.MinValue, short.MaxValue);
-
-            prevPrev[channel] = prev[channel];
-            prev[channel] = reconstructed;
-            samples[processed] = (short)reconstructed;
-            processed++;
-        }
-
-        return new DecompressionResult(
-            samples,
-            header.SampleRate,
-            (short)header.Channels,
-            (short)header.BitsPerSample);
-    }
+    
 
     protected override long ParseInput(byte[] compressedData) {
         _inputStream = new MemoryStream(compressedData);

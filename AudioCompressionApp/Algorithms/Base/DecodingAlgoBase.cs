@@ -44,9 +44,6 @@ public abstract class DecodingAlgoBase : IDecodingAlgo{
             }
         }, cancellationToken);
     }
-
-    public virtual DecompressionResult Decompress(byte[] compressedData)
-        => DecompressAsync(compressedData).GetAwaiter().GetResult();
     
     protected abstract long ParseInput(byte[] compressedData);
     protected virtual long InitializeSamples() => 0;

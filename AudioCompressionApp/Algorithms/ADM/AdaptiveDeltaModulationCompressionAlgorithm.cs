@@ -1,9 +1,8 @@
-using AudioCompressionApp.Algorithms.ADM;
-using AudioCompressionApp.Algorithms.Base;
+using AudioCompressionApp.Algorithms.Common;
 using AudioCompressionApp.Models;
 using AudioCompressionApp.Models.Settings;
 
-namespace AudioCompressionApp.Algorithms;
+namespace AudioCompressionApp.Algorithms.ADM;
 
 public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmBase {
     private List<bool> _encodedBits = [];
@@ -42,7 +41,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         }
 
 
-        // Current estimate before decision
+        // Current estimate
         double estimate = _reconstructed;
 
         // Error
@@ -51,7 +50,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         // Quantizer decision
         bool bit = error >= 0;
 
-        // Transmitted value (+Δ or -Δ)
+        // Transmitted value
         double transmitted = bit ? _stepSize : -_stepSize;
 
         // Update accumulator
@@ -83,7 +82,6 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
         }
        
         else if (_previousBit != currentBit) {
-            // _stepSize = _stepSize * _settings.StepDecreaseFactor - _settings.constFactor;
             _stepSize = _settings.InitialStepSize;
         }
 
@@ -114,7 +112,7 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
     }
 
     protected override void FinalizeEncoding() {
-        byte[] payload = AdmBitPacker.PackBits(_encodedBits);
+        byte[] payload = BitPacker.PackBits(_encodedBits);
         AdmHeader header =
             new() {
                 SampleRate = _context.Settings.SampleRate,
@@ -128,7 +126,6 @@ public class AdaptiveDeltaModulationCompressionAlgorithm : CompressionAlgorithmB
                 InitialPredictor = _context.Samples[0],
                 StepIncreaseFactor = _settings.StepIncreaseFactor,
                 StepDecreaseFactor = _settings.StepDecreaseFactor,
-                ConstFactor = _settings.constFactor,
                 
             };
 

@@ -938,6 +938,100 @@
                                         </StackPanel>
                                     </DataTemplate>
 
+                                    <!-- DataTemplate for Adaptive Delta Modulation -->
+                                    <DataTemplate DataType="{x:Type vm:AdmSettingsViewModel}">
+                                        <StackPanel>
+                                            <TextBlock Text="INITIAL STEP SIZE"
+                                                       Style="{StaticResource Style.Label}"
+                                                       Margin="0,0,0,6" />
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="60" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Grid.Column="0"
+                                                        Style="{StaticResource Style.Slider}"
+                                                        Minimum="10" Maximum="500"
+                                                        Value="{Binding AdmInitialStepSize}"
+                                                        VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding AdmInitialStepSize, StringFormat=F0}"
+                                                           Style="{StaticResource Style.StatValue}"
+                                                           FontSize="{StaticResource FontSize.Body}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+
+                                            <TextBlock Text="STEP INCREASE FACTOR"
+                                                       Style="{StaticResource Style.Label}"
+                                                       Margin="0,16,0,6" />
+                                            <Grid Margin="0,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="60" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Grid.Column="0"
+                                                        Style="{StaticResource Style.Slider}"
+                                                        Minimum="1.01" Maximum="2.0"
+                                                        Value="{Binding AdmStepIncreaseFactor}"
+                                                        VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding AdmStepIncreaseFactor, StringFormat=F2}"
+                                                           Style="{StaticResource Style.StatValue}"
+                                                           FontSize="{StaticResource FontSize.Body}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+
+                                            <TextBlock Text="STEP DECREASE FACTOR"
+                                                       Style="{StaticResource Style.Label}"
+                                                       Margin="0,16,0,6" />
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="60" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Grid.Column="0"
+                                                        Style="{StaticResource Style.Slider}"
+                                                        Minimum="0.5" Maximum="0.99"
+                                                        Value="{Binding AdmStepDecreaseFactor}"
+                                                        VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding AdmStepDecreaseFactor, StringFormat=F2}"
+                                                           Style="{StaticResource Style.StatValue}"
+                                                           FontSize="{StaticResource FontSize.Body}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </DataTemplate>
+
+                                    <!-- DataTemplate for Delta Modulation -->
+                                    <DataTemplate DataType="{x:Type vm:DmSettingsViewModel}">
+                                        <StackPanel>
+                                            <TextBlock Text="INITIAL STEP SIZE"
+                                                       Style="{StaticResource Style.Label}"
+                                                       Margin="0,0,0,6" />
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="60" />
+                                                </Grid.ColumnDefinitions>
+                                                <Slider Grid.Column="0"
+                                                        Style="{StaticResource Style.Slider}"
+                                                        Minimum="10" Maximum="500"
+                                                        Value="{Binding DmInitialStepSize}"
+                                                        VerticalAlignment="Center" />
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding DmInitialStepSize, StringFormat=F0}"
+                                                           Style="{StaticResource Style.StatValue}"
+                                                           FontSize="{StaticResource FontSize.Body}"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Center" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </DataTemplate>
+
                                     <!-- DataTemplate for algorithms with no settings -->
                                     <DataTemplate DataType="{x:Type vm:NoSettingsViewModel}">
                                         <TextBlock Text="No configurable settings for this algorithm."
@@ -1092,16 +1186,6 @@
                                         </StackPanel>
                                     </Canvas>
                                 </Button>
-                                <Button Style="{StaticResource Style.Button.Icon}"
-                                        IsEnabled="False" ToolTip="Skip">
-                                    <Canvas Width="14" Height="14">
-                                        <Polygon Points="0,0 10,7 0,14"
-                                                 Fill="{StaticResource Brush.TextMuted}" />
-                                        <Rectangle Canvas.Left="11" Width="3" Height="14"
-                                                   Fill="{StaticResource Brush.TextMuted}"
-                                                   RadiusX="1" RadiusY="1" />
-                                    </Canvas>
-                                </Button>
                             </StackPanel>
 
                         </StackPanel>
@@ -1156,183 +1240,183 @@
             <!-- ─────────────────────────────────────────────
      ROW 4 — PROGRESS + RESULTS STRIP
 ────────────────────────────────────────────── -->
-<Border Grid.Row="4"
-        Style="{StaticResource Style.Card}"
-        Padding="24,18">
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="24" />
-            <ColumnDefinition Width="Auto" />
-        </Grid.ColumnDefinitions>
+            <Border Grid.Row="4"
+                    Style="{StaticResource Style.Card}"
+                    Padding="24,18">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="24" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
 
-        <!-- ── Left column: progress bar + live chips ── -->
-        <StackPanel Grid.Column="0">
-            <Grid Margin="0,0,0,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                    <!-- ── Left column: progress bar + live chips ── -->
+                    <StackPanel Grid.Column="0">
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
-                            <Setter Property="Text" Value="COMPRESSION PROGRESS" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                    <Setter Property="Text" Value="DECOMPRESSION PROGRESS" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
+                            <TextBlock Grid.Column="0">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
+                                        <Setter Property="Text" Value="COMPRESSION PROGRESS" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                <Setter Property="Text" Value="DECOMPRESSION PROGRESS" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
 
-                <!-- Percentage label — switches binding per mode -->
-                <TextBlock Grid.Column="1"
-                           FontSize="{StaticResource FontSize.Body}">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
-                            <Setter Property="Text"
-                                    Value="{Binding OperationProgress,
+                            <!-- Percentage label — switches binding per mode -->
+                            <TextBlock Grid.Column="1"
+                                       FontSize="{StaticResource FontSize.Body}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
+                                        <Setter Property="Text"
+                                                Value="{Binding OperationProgress,
                                             Converter={StaticResource ProgressToPercent}}" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                    <Setter Property="Text"
-                                            Value="{Binding DecompressionProgress,
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                <Setter Property="Text"
+                                                        Value="{Binding DecompressionProgress,
                                                     Converter={StaticResource ProgressToPercent}}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </Grid>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
 
-            <!-- Progress bar — switches binding per mode -->
-            <ProgressBar>
-                <ProgressBar.Style>
-                    <Style TargetType="ProgressBar" BasedOn="{StaticResource Style.ProgressBar}">
-                        <Setter Property="Value" Value="{Binding OperationProgress}" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                <Setter Property="Value" Value="{Binding DecompressionProgress}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ProgressBar.Style>
-            </ProgressBar>
-
-            <!-- Live chips — compress mode shows Speed + Live Ratio,
-                 decompress mode shows Speed only (ratio not meaningful) -->
-            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
-
-                <!-- Speed chip -->
-                <Border Style="{StaticResource Style.InfoChip}" Margin="0,0,8,0">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="SPEED "
-                                   Style="{StaticResource Style.Label}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock>
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
-                                    <Setter Property="Text" Value="{Binding ProcessingSpeed}" />
+                        <!-- Progress bar — switches binding per mode -->
+                        <ProgressBar>
+                            <ProgressBar.Style>
+                                <Style TargetType="ProgressBar" BasedOn="{StaticResource Style.ProgressBar}">
+                                    <Setter Property="Value" Value="{Binding OperationProgress}" />
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                            <Setter Property="Text" Value="{Binding DecompressionSpeed}" />
+                                            <Setter Property="Value" Value="{Binding DecompressionProgress}" />
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                            </ProgressBar.Style>
+                        </ProgressBar>
+
+                        <!-- Live chips — compress mode shows Speed + Live Ratio,
+                 decompress mode shows Speed only (ratio not meaningful) -->
+                        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+
+                            <!-- Speed chip -->
+                            <Border Style="{StaticResource Style.InfoChip}" Margin="0,0,8,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="SPEED "
+                                               Style="{StaticResource Style.Label}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
+                                                <Setter Property="Text" Value="{Binding ProcessingSpeed}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                        <Setter Property="Text" Value="{Binding DecompressionSpeed}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Live Ratio chip — compression only -->
+                            <Border Style="{StaticResource Style.InfoChip}"
+                                    Visibility="{Binding IsCompressMode,
+                                     Converter={StaticResource BoolToVisibility}}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="LIVE RATIO "
+                                               Style="{StaticResource Style.Label}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding LiveCompressionRatio}"
+                                               Style="{StaticResource Style.StatValue}"
+                                               FontSize="{StaticResource FontSize.Small}"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
                     </StackPanel>
-                </Border>
 
-                <!-- Live Ratio chip — compression only -->
-                <Border Style="{StaticResource Style.InfoChip}"
-                        Visibility="{Binding IsCompressMode,
+                    <Rectangle Grid.Column="1" Width="1"
+                               Fill="{StaticResource Brush.Border}" Margin="0,4" />
+
+                    <!-- ── Right column: final result stats ── -->
+                    <UniformGrid Grid.Column="2" Columns="4" VerticalAlignment="Center">
+
+                        <!-- Final Ratio — compression only -->
+                        <StackPanel Margin="16,0"
+                                    Visibility="{Binding IsCompressMode,
                                      Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="LIVE RATIO "
-                                   Style="{StaticResource Style.Label}"
-                                   VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding LiveCompressionRatio}"
-                                   Style="{StaticResource Style.StatValue}"
-                                   FontSize="{StaticResource FontSize.Small}"
-                                   VerticalAlignment="Center" />
-                    </StackPanel>
-                </Border>
+                            <TextBlock Text="FINAL RATIO"
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding FinalCompressionRatio}"
+                                       Style="{StaticResource Style.StatValue}" />
+                        </StackPanel>
 
-            </StackPanel>
-        </StackPanel>
-
-        <Rectangle Grid.Column="1" Width="1"
-                   Fill="{StaticResource Brush.Border}" Margin="0,4" />
-
-        <!-- ── Right column: final result stats ── -->
-        <UniformGrid Grid.Column="2" Columns="4" VerticalAlignment="Center">
-
-            <!-- Final Ratio — compression only -->
-            <StackPanel Margin="16,0"
-                        Visibility="{Binding IsCompressMode,
+                        <!-- Space Saved — compression only -->
+                        <StackPanel Margin="16,0"
+                                    Visibility="{Binding IsCompressMode,
                                      Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="FINAL RATIO"
-                           Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding FinalCompressionRatio}"
-                           Style="{StaticResource Style.StatValue}" />
-            </StackPanel>
+                            <TextBlock Text="SPACE SAVED"
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding SpaceSaved}"
+                                       Style="{StaticResource Style.StatValue}"
+                                       Foreground="{StaticResource Brush.Success}" />
+                        </StackPanel>
 
-            <!-- Space Saved — compression only -->
-            <StackPanel Margin="16,0"
-                        Visibility="{Binding IsCompressMode,
+                        <!-- SNR — compression only -->
+                        <StackPanel Margin="16,0"
+                                    Visibility="{Binding IsCompressMode,
                                      Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="SPACE SAVED"
-                           Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding SpaceSaved}"
-                           Style="{StaticResource Style.StatValue}"
-                           Foreground="{StaticResource Brush.Success}" />
-            </StackPanel>
+                            <TextBlock Text="SNR"
+                                       Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding SnrDb}"
+                                       Style="{StaticResource Style.StatValue}"
+                                       Foreground="{StaticResource Brush.Amber}" />
+                        </StackPanel>
 
-            <!-- SNR — compression only -->
-            <StackPanel Margin="16,0"
-                        Visibility="{Binding IsCompressMode,
-                                     Converter={StaticResource BoolToVisibility}}">
-                <TextBlock Text="SNR"
-                           Style="{StaticResource Style.Label}" Margin="0,0,0,4" />
-                <TextBlock Text="{Binding SnrDb}"
-                           Style="{StaticResource Style.StatValue}"
-                           Foreground="{StaticResource Brush.Amber}" />
-            </StackPanel>
+                        <!-- Duration — shared slot, label + value both switch -->
+                        <StackPanel Margin="16,0">
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
+                                        <Setter Property="Text" Value="COMPRESS TIME" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                <Setter Property="Text" Value="DECOMPRESS TIME" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock>
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
+                                        <Setter Property="Text" Value="{Binding FinalDuration}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
+                                                <Setter Property="Text" Value="{Binding FinalDecompressionTime}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
 
-            <!-- Duration — shared slot, label + value both switch -->
-            <StackPanel Margin="16,0">
-                <TextBlock >
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource Style.Label}">
-                            <Setter Property="Text" Value="COMPRESS TIME" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                    <Setter Property="Text" Value="DECOMPRESS TIME" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-                <TextBlock >
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock" BasedOn="{StaticResource Style.StatValue}">
-                            <Setter Property="Text" Value="{Binding FinalDuration}" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsDecompressMode}" Value="True">
-                                    <Setter Property="Text" Value="{Binding FinalDecompressionTime}" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-            </StackPanel>
-
-        </UniformGrid>
-    </Grid>
-</Border>
+                    </UniformGrid>
+                </Grid>
+            </Border>
         </Grid>
     </Grid>
 </Window>

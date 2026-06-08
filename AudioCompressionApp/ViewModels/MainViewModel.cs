@@ -1,14 +1,10 @@
-using System;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using System.Windows;
 using AudioCompressionApp.Algorithms;
 using AudioCompressionApp.Algorithms.ADM;
-using AudioCompressionApp.Algorithms.ADM.Filters;
 using AudioCompressionApp.Algorithms.Base;
+using AudioCompressionApp.Algorithms.DM;
 using AudioCompressionApp.Algorithms.Nonlinear;
 using AudioCompressionApp.Models;
 using AudioCompressionApp.Models.Settings;
@@ -113,6 +109,11 @@ public partial class MainViewModel : ObservableObject {
     [ObservableProperty] private int _nlqQuantizationBits = 8;
     [ObservableProperty] private int _dpcmQuantizationStep = 8;
     [ObservableProperty] private int _dpcmPredictorOrder = 1;
+
+    [ObservableProperty] private double _admInitialStepSize = 100;
+    [ObservableProperty] private double _admStepIncreaseFactor = 1.1;
+    [ObservableProperty] private double _admStepDecreaseFactor = 0.9;
+    [ObservableProperty] private double _dmInitialStepSize = 100;
 
     /// <summary>
     /// Returns a ViewModel that exposes the editable settings for
@@ -362,41 +363,66 @@ public partial class MainViewModel : ObservableObject {
     /// Loads a compressed audio file.
     /// </summary>
     public async Task LoadCompressedFile(string filePath) {
+        byte[] fileBytes = await _audioFileService.GetFileBytes(filePath);
         string magic = await _audioFileService.GetMagicName(filePath);
         IDecodingAlgo decodingAlgo = DecodingAlgorithmFactory.Create(magic);
+
+        var (sampleRate, channels, bitsPerSample) = ReadCommonHeaderFields(fileBytes);
+
         CompressedFileInfo = new CompressedFileModel {
             FilePath = filePath,
             FileName = Path.GetFileName(filePath),
             AlgorithmName = decodingAlgo.Name,
-            // TODO: read SampleRate, Channels, BitsPerSample from the file header
-            // e.g. SampleRate    = header.SampleRate,
-            //      Channels      = header.Channels,
-            //      BitsPerSample = header.BitsPerSample,
+            SampleRate = sampleRate,
+            Channels = channels,
+            BitsPerSample = bitsPerSample,
         };
 
         IsCompressedFileLoaded = true;
         AddLog($"Loaded compressed: {CompressedFileInfo.FileName}");
     }
 
+    private static (int SampleRate, int Channels, int BitsPerSample)
+        ReadCommonHeaderFields(byte[] fileBytes) {
+        using var ms = new MemoryStream(fileBytes);
+        using var reader = new BinaryReader(ms);
+
+        reader.ReadBytes(4);
+        int sampleRate = reader.ReadInt32();
+        int channels = reader.ReadInt32();
+        int bitsPerSample = reader.ReadInt32();
+
+        return (sampleRate, channels, bitsPerSample);
+    }
+
     // =========================================================
     // COMMANDS — PLAYBACK  (source audio)
     // =========================================================
 
+    // And Play() — resume if paused, start fresh otherwise
     [RelayCommand(CanExecute = nameof(CanPlay))]
     private void Play() {
         if (CurrentAudioFile == null || string.IsNullOrWhiteSpace(CurrentAudioFile.FilePath))
             return;
 
-        _audioPlaybackService.Play(CurrentAudioFile.FilePath);
+        if (IsSourcePaused) {
+            _audioPlaybackService.Resume();
+        }
+        else {
+            _audioPlaybackService.Play(CurrentAudioFile.FilePath);
+        }
+
         IsPlayingSource = true;
         IsSourcePaused = false;
         AddLog("Playback started");
     }
 
-    private bool CanPlay() => IsAudioLoaded && !IsPlayingSource;
+// CanPlay must also allow resuming from pause
+    private bool CanPlay() => IsAudioLoaded && (!IsPlayingSource || IsSourcePaused);
 
     [RelayCommand(CanExecute = nameof(CanPause))]
     private void Pause() {
+        _audioPlaybackService.Pause();
         IsPlayingSource = false;
         IsSourcePaused = true;
         AddLog("Playback paused");
@@ -649,8 +675,8 @@ public partial class MainViewModel : ObservableObject {
         return algorithm switch {
             NonlinearQuantizationCompressionAlgorithm => new NlqSettingsViewModel(this),
             DpcmCompressionAlgorithm => new DpcmSettingsViewModel(this),
-            AdaptiveDeltaModulationCompressionAlgorithm => new NoSettingsViewModel(),
-            DeltaModulationCompressionAlgorithm => new NoSettingsViewModel(),
+            AdaptiveDeltaModulationCompressionAlgorithm => new AdmSettingsViewModel(this),
+            DeltaModulationCompressionAlgorithm => new DmSettingsViewModel(this),
             _ => null,
         };
     }
@@ -672,12 +698,16 @@ public partial class MainViewModel : ObservableObject {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
+                    InitialStepSize = AdmInitialStepSize,
+                    StepIncreaseFactor = AdmStepIncreaseFactor,
+                    StepDecreaseFactor = AdmStepDecreaseFactor,
                 },
             DeltaModulationCompressionAlgorithm =>
                 new DeltaModulationSettings {
                     SampleRate = CurrentAudioFile.SampleRate,
                     Channels = CurrentAudioFile.Channels,
                     BitsPerSample = CurrentAudioFile.BitsPerSample,
+                    InitialStepSize = DmInitialStepSize,
                 },
             NonlinearQuantizationCompressionAlgorithm =>
                 new NonlinearDifferentialCodingSettings {
@@ -763,6 +793,56 @@ public partial class DpcmSettingsViewModel : AlgorithmSettingsViewModel {
         set {
             if (_mainVm.DpcmPredictorOrder != value) {
                 _mainVm.DpcmPredictorOrder = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+}
+
+public partial class AdmSettingsViewModel : AlgorithmSettingsViewModel {
+    private readonly MainViewModel _mainVm;
+    public AdmSettingsViewModel(MainViewModel mainVm) => _mainVm = mainVm;
+
+    public double AdmInitialStepSize {
+        get => _mainVm.AdmInitialStepSize;
+        set {
+            if (_mainVm.AdmInitialStepSize != value) {
+                _mainVm.AdmInitialStepSize = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public double AdmStepIncreaseFactor {
+        get => _mainVm.AdmStepIncreaseFactor;
+        set {
+            if (_mainVm.AdmStepIncreaseFactor != value) {
+                _mainVm.AdmStepIncreaseFactor = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public double AdmStepDecreaseFactor {
+        get => _mainVm.AdmStepDecreaseFactor;
+        set {
+            if (_mainVm.AdmStepDecreaseFactor != value) {
+                _mainVm.AdmStepDecreaseFactor = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+}
+
+public partial class DmSettingsViewModel : AlgorithmSettingsViewModel {
+    private readonly MainViewModel _mainVm;
+    public DmSettingsViewModel(MainViewModel mainVm) => _mainVm = mainVm;
+
+    public double DmInitialStepSize {
+        get => _mainVm.DmInitialStepSize;
+        set {
+            if (_mainVm.DmInitialStepSize != value) {
+                _mainVm.DmInitialStepSize = value;
                 OnPropertyChanged();
             }
         }

@@ -1,4 +1,6 @@
-namespace AudioCompressionApp.Models.Settings;
+using AudioCompressionApp.Models.Settings;
+
+namespace AudioCompressionApp.Algorithms.ADM;
 
 public class AdaptiveDeltaModulationSettings
     : CompressionSettings
@@ -11,12 +13,4 @@ public class AdaptiveDeltaModulationSettings
 
     public double StepDecreaseFactor { get; set; }
         = 0.9;
-
-    public double MinimumStepSize { get; set; }
-        = 1;
-
-    public double MaximumStepSize { get; set; }
-        = 10000;
-
-    public double constFactor { get; set; } = 100;
 }

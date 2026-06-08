@@ -2,8 +2,7 @@ using NAudio.Wave;
 
 namespace AudioCompressionApp.Services;
 
-public class AudioPlaybackService : IDisposable
-{
+public class AudioPlaybackService : IDisposable {
     private WaveOutEvent? _outputDevice;
 
     private AudioFileReader? _audioFile;
@@ -11,8 +10,7 @@ public class AudioPlaybackService : IDisposable
     public bool IsPlaying =>
         _outputDevice?.PlaybackState == PlaybackState.Playing;
 
-    public void Play(string filePath)
-    {
+    public void Play(string filePath) {
         Stop();
 
         _audioFile = new AudioFileReader(filePath);
@@ -24,8 +22,7 @@ public class AudioPlaybackService : IDisposable
         _outputDevice.Play();
     }
 
-    public void Stop()
-    {
+    public void Stop() {
         _outputDevice?.Stop();
 
         _outputDevice?.Dispose();
@@ -37,8 +34,15 @@ public class AudioPlaybackService : IDisposable
         _audioFile = null;
     }
 
-    public void Dispose()
-    {
+    public void Pause() {
+        _outputDevice?.Pause();
+    }
+
+    public void Resume() {
+        _outputDevice?.Play(); 
+    }
+
+    public void Dispose() {
         Stop();
     }
 }

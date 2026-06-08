@@ -1,26 +1,26 @@
+
 using AudioCompressionApp.Algorithms.Base;
 using AudioCompressionApp.Algorithms.Common;
 using AudioCompressionApp.Algorithms.Common.LowPassFilters;
 using AudioCompressionApp.Models;
 
-namespace AudioCompressionApp.Algorithms.ADM;
+namespace AudioCompressionApp.Algorithms.DM;
 
-public class AdmDecodingAlgo : DecodingAlgoBase {
-    private AdmHeader _header;
+public class DmDecodingAlgo : DecodingAlgoBase {
+    private DmHeader _header;
     private double _reconstructed;
     private List<bool> _encodedBits = [];
     private double _stepSize;
-    private bool? _previousBit;
 
     public override string Name => "Adaptive Delta Modulation";
 
-  
+   
+
     protected override long ParseInput(byte[] compressedData) {
-        var (header, payload) = AdmFileReader.Read(compressedData);
+        var (header, payload) = DmFileReader.Read(compressedData);
         _header = header;
         _encodedBits = BitPacker.UnpackBits(payload, header.SampleCount);
         _stepSize = header.InitialStepSize;
-        _previousBit = null;
         _reconstructed = _header.InitialPredictor;
         return header.SampleCount;
     }
@@ -35,12 +35,11 @@ public class AdmDecodingAlgo : DecodingAlgoBase {
             _reconstructed,
             short.MinValue,
             short.MaxValue);
-        AdaptStepSize(_encodedBits[(int)index]);
     }
 
     protected override DecompressionResult BuildDecompressionResult() {
         
-        // ── SNR comparison
+        // ── SNR comparison across all low-pass filter variants ────────────────
         // IAdmLowPassFilter[] filters = [
         //     AdmLowPassFilters.None(),
         //
@@ -67,21 +66,4 @@ public class AdmDecodingAlgo : DecodingAlgoBase {
             _header.BitsPerSample);
 
     } 
-    private void AdaptStepSize(
-        bool currentBit) {
-        if (_previousBit == null) {
-            _previousBit = currentBit;
-            return;
-        }
-
-        if (_previousBit == currentBit) {
-            _stepSize = _stepSize * _header.StepIncreaseFactor;
-        }
-        else if (_previousBit != currentBit) {
-            // _stepSize = _stepSize * _header.StepDecreaseFactor - _header.ConstFactor;
-            _stepSize = _header.InitialStepSize;
-        }
-
-        _previousBit = currentBit;
-    }
 }
