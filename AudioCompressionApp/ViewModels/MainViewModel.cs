@@ -337,6 +337,7 @@ public partial class MainViewModel : ObservableObject {
 
     /// <summary>
     /// Loads and validates a raw audio file from a file path.
+    /// Supports both WAV and MP3 formats.
     /// </summary>
     public void LoadAudioFile(string filePath) {
         if (!_audioFileService.IsSupportedAudioFile(filePath)) {
@@ -344,6 +345,25 @@ public partial class MainViewModel : ObservableObject {
             return;
         }
 
+        string extension = Path.GetExtension(filePath).ToLowerInvariant();
+        
+        try {
+            if (extension == ".wav") {
+                LoadWavFile(filePath);
+            }
+            else if (extension == ".mp3") {
+                LoadMp3File(filePath);
+            }
+            else {
+                AddLog($"Unsupported audio format: {extension}");
+            }
+        }
+        catch (Exception ex) {
+            AddLog($"Error loading audio file: {ex.Message}");
+        }
+    }
+
+    private void LoadWavFile(string filePath) {
         using var reader = new WaveFileReader(filePath);
         CurrentAudioFile = new AudioFileModel {
             FilePath = filePath,
@@ -353,6 +373,26 @@ public partial class MainViewModel : ObservableObject {
             BitsPerSample = reader.WaveFormat.BitsPerSample,
             // TotalSamples drives the play duration display
             TotalSamples = reader.SampleCount,
+        };
+
+        IsAudioLoaded = true;
+        AddLog($"Loaded: {CurrentAudioFile.FileName}");
+    }
+
+    private void LoadMp3File(string filePath) {
+        using var reader = new AudioFileReader(filePath);
+        // For MP3, we need to calculate total samples by reading the file
+        // AudioFileReader doesn't provide direct SampleCount, so we estimate based on format
+        long estimatedTotalSamples = (long)(reader.TotalTime.TotalSeconds * reader.WaveFormat.SampleRate * reader.WaveFormat.Channels);
+        
+        CurrentAudioFile = new AudioFileModel {
+            FilePath = filePath,
+            FileName = Path.GetFileName(filePath),
+            SampleRate = reader.WaveFormat.SampleRate,
+            Channels = reader.WaveFormat.Channels,
+            BitsPerSample = 16, // MP3 is typically 16-bit (or we normalize to 16-bit)
+            // TotalSamples drives the play duration display
+            TotalSamples = estimatedTotalSamples,
         };
 
         IsAudioLoaded = true;
